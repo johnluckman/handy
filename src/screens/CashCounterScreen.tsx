@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, Button, Alert, TextInput, ActivityIndicator, Platform, TouchableWithoutFeedback, Keyboard } from 'react-native';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { View, Text, StyleSheet, ScrollView, Button, Alert, TextInput, ActivityIndicator, Platform, TouchableWithoutFeedback, Keyboard, TouchableOpacity } from 'react-native';
 import NetInfo, { useNetInfo } from '@react-native-community/netinfo';
 import { LinearGradient } from 'expo-linear-gradient';
 import DenominationRow, { RowData } from '../components/DenominationRow';
@@ -7,6 +7,9 @@ import { denominations, Denomination } from '../utils/denominations';
 import { appendToSheet, testConnection, getInitialOwedData } from '../services/googleSheets';
 import { addToQueue } from '../services/queueService';
 import { useQueue } from '../context/QueueContext'; // Corrected import path
+import { useNavigation } from '@react-navigation/native';
+import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import { NavigationProps } from '../navigation/AppNavigator';
 
 // Defines the structure for our state, mapping each denomination ID to its RowData
 interface DenominationData {
@@ -32,6 +35,7 @@ const initializeState = (): DenominationData => {
  * @returns {React.ReactElement} The Cash Counter screen component.
  */
 export default function CashCounterScreen(): React.ReactElement {
+  const navigation = useNavigation<NavigationProps>();
   const [data, setData] = React.useState<DenominationData>(initializeState);
   const [isLoading, setIsLoading] = React.useState(true);
   const [isTesting, setIsTesting] = React.useState(false);
@@ -54,7 +58,36 @@ export default function CashCounterScreen(): React.ReactElement {
     }, 0);
   };
   
-  const total = calculateTotal();
+  const total = useMemo(() => {
+    return calculateTotal();
+  }, [data, calculateTotal]);
+
+  const { totalTargetFloat, idealFloat, totalBorrowed, totalReturned } = useMemo(() => {
+    const idealFloatCalc = denominations.reduce(
+      (sum, deno) => sum + deno.targetCount * deno.value,
+      0
+    );
+
+    let targetFloat = 0;
+    let borrowed = 0;
+    let returned = 0;
+
+    for (const id in data) {
+      const denomination = denominations.find(d => d.id === id);
+      if (denomination) {
+        targetFloat += (data[id].targetFloat || 0) * denomination.value;
+        borrowed += (data[id].borrow || 0) * denomination.value;
+        returned += (data[id].returned || 0) * denomination.value;
+      }
+    }
+
+    return {
+      totalTargetFloat: targetFloat,
+      idealFloat: idealFloatCalc,
+      totalBorrowed: borrowed,
+      totalReturned: returned,
+    };
+  }, [data]);
 
   const handleTestConnection = async () => {
     console.warn('🧪 Test connection button pressed');
@@ -125,9 +158,9 @@ export default function CashCounterScreen(): React.ReactElement {
             }
             return updatedData;
         });
-        Alert.alert('Success', 'Submission synced successfully!');
+        Alert.alert('Success', 'You cash count has been submitted!');
       } else {
-        Alert.alert('Submission Saved', 'Your count has been saved and will sync next time you are online.');
+        Alert.alert('Count Saved', 'Your count has been saved and will sync next time you are online.');
       }
 
       // 4. Clear the user-input parts of the form
@@ -175,80 +208,104 @@ export default function CashCounterScreen(): React.ReactElement {
     return (
       <View style={styles.centered}>
         <ActivityIndicator size="large" color="#007AFF" />
-        <Text>Loading from Sheet...</Text>
+        <Text>Loading data...</Text>
       </View>
     );
   }
 
   return (
     <View style={styles.screen}>
-      <LinearGradient
-        colors={['#39b878', '#2E9A65']} // Your specified color fading to a darker shade
-        style={styles.header}
+      <ScrollView
+        style={{ flex: 1 }}
+        keyboardShouldPersistTaps="handled"
       >
-        <View style={styles.headerLeft}>
-          <View style={styles.logoPlaceholder} />
-          <Text style={styles.headerTitle}>Cash Counter</Text>
-        </View>
-        <View style={styles.headerRight}>
-          <Text style={styles.statusText}>
-            <Text style={{ color: netInfo.isConnected ? '#dcedc8' : '#ffcdd2' }}>● </Text>
-            {netInfo.isConnected ? 'Online' : 'Offline'}
-          </Text>
-          {queueSize > 0 && (
-            <Text style={styles.queueText}>
-              {queueSize} pending
-            </Text>
-          )}
-        </View>
-      </LinearGradient>
-
-      <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
-        <ScrollView
-          style={styles.container}
-          contentContainerStyle={styles.contentContainer}
-          keyboardShouldPersistTaps="handled"
+        <LinearGradient
+          colors={['#39b878', '#2E9A65']} // Your specified color fading to a darker shade
+          style={styles.header}
         >
-          {/* <Text style={styles.title}>Cash Count</Text> */}
-
-          <View style={styles.userInputsContainer}>
-            <TextInput
-              style={styles.textInput}
-              placeholder="Your Name"
-              value={userName}
-              onChangeText={setUserName}
-            />
-            <TextInput
-              style={styles.textInput}
-              placeholder="Add notes (e.g., End of Day Till 1)"
-              value={notes}
-              onChangeText={setNotes}
-            />
+          <View style={styles.headerLeft}>
+            <TouchableOpacity 
+              style={styles.backButton}
+              onPress={() => navigation.navigate('Dashboard')}
+            >
+              <Icon name="arrow-left" size={24} color="#ffffff" />
+            </TouchableOpacity>
+            <Text style={styles.headerTitle}>Cash Counter</Text>
           </View>
-
-          <View style={styles.list}>
-            {denominations.map((item: Denomination) => (
-              <DenominationRow
-                key={item.id}
-                denomination={item}
-                rowData={data[item.id]}
-                onRowDataChange={handleRowDataChange}
+          <View style={styles.headerRight}>
+            <Text style={styles.statusText}>
+              <Text style={{ color: netInfo.isConnected ? '#dcedc8' : '#ffcdd2' }}>● </Text>
+              {netInfo.isConnected ? 'Online' : 'Offline'}
+            </Text>
+            {queueSize > 0 && (
+              <Text style={styles.queueText}>
+                {queueSize} pending
+              </Text>
+            )}
+          </View>
+        </LinearGradient>
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+          <View style={styles.contentWrapper}>
+            {/* <Text style={styles.title}>Cash Count</Text> */}
+            <View style={styles.userInputsContainer}>
+              <TextInput
+                style={styles.textInput}
+                placeholder="Your Name"
+                value={userName}
+                onChangeText={setUserName}
               />
-            ))}
-          </View>
+              <TextInput
+                style={styles.textInput}
+                placeholder="Add comments"
+                value={notes}
+                onChangeText={setNotes}
+              />
+            </View>
 
-          <View style={styles.summaryContainer}>
-            <Text style={styles.totalText}>Count Total:</Text>
-            <Text style={styles.totalAmount}>{`$${total.toFixed(2)}`}</Text>
-          </View>
+            <View style={styles.list}>
+              {denominations.map((item: Denomination) => (
+                <DenominationRow
+                  key={item.id}
+                  denomination={item}
+                  rowData={data[item.id]}
+                  onRowDataChange={handleRowDataChange}
+                />
+              ))}
+            </View>
 
-          <Button
-            title={isLoading ? 'Submitting...' : 'Submit Count'}
-            onPress={handleSubmit}
-            disabled={isLoading || isTesting}
-          />
-        </ScrollView>
-      </TouchableWithoutFeedback>
+            <View style={styles.summaryContainer}>
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Count Total:</Text>
+                <Text style={styles.summaryValue}>{`$${total.toFixed(2)}`}</Text>
+              </View>
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Float total:</Text>
+                <Text style={styles.summaryValue}>{`$${totalTargetFloat.toFixed(2)} / $${idealFloat.toFixed(2)}`}</Text>
+              </View>
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Borrow total:</Text>
+                <Text style={styles.summaryValue}>{`$${totalBorrowed.toFixed(2)}`}</Text>
+              </View>
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Total returned:</Text>
+                <Text style={styles.summaryValue}>{`$${totalReturned.toFixed(2)}`}</Text>
+              </View>
+            </View>
+
+            <View style={styles.buttonContainer}>
+              <TouchableOpacity
+                style={[styles.submitButton, (isLoading || isTesting) && styles.submitButtonDisabled]}
+                onPress={handleSubmit}
+                disabled={isLoading || isTesting}
+              >
+                <Text style={styles.submitButtonText}>
+                  {isLoading ? 'Submitting...' : 'Submit Count'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </TouchableWithoutFeedback>
+      </ScrollView>
     </View>
   );
 }
@@ -256,51 +313,54 @@ export default function CashCounterScreen(): React.ReactElement {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: '#f5f5f5', // The main background is now the card color
+    backgroundColor: '#39b878',
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between', // Pushes left and right sides apart
+    justifyContent: 'space-between',
     paddingHorizontal: 20,
     paddingTop: 50,
-    paddingBottom: 20,
+    paddingBottom: 40,
   },
   headerLeft: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   headerRight: {
-    alignItems: 'flex-end', // Aligns status text to the right
+    alignItems: 'flex-end',
   },
-  logoPlaceholder: {
+  backButton: {
     width: 40,
     height: 40,
     borderRadius: 8,
     backgroundColor: 'rgba(255,255,255,0.2)',
     marginRight: 15,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   headerTitle: {
     fontSize: 24,
-    fontWeight: 'bold',
+    fontFamily: 'Inter-Bold',
     color: '#ffffff',
   },
-  container: {
-    flex: 1,
-    // The container no longer needs a background color, as the screen provides it
-  },
-  contentContainer: {
+  contentWrapper: {
+    backgroundColor: '#f5f5f5',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
     padding: 20,
     paddingBottom: 60,
+    marginTop: -20,
   },
   statusText: {
-    fontWeight: 'bold',
+    fontFamily: 'Inter-SemiBold',
     fontSize: 14,
-    color: '#ffffff', // White text for better contrast on the gradient
+    color: '#ffffff',
   },
   queueText: {
-    color: '#e0e0e0', // A slightly dimmer white for the sub-text
+    color: '#e0e0e0',
     fontSize: 12,
+    fontFamily: 'Inter-Regular',
   },
   title: {
     fontSize: 28,
@@ -321,37 +381,52 @@ const styles = StyleSheet.create({
     padding: 12,
     fontSize: 16,
     marginBottom: 10,
+    fontFamily: 'Inter-Regular',
   },
   list: {
     marginBottom: 20,
   },
   summaryContainer: {
+    paddingVertical: 15,
+    paddingHorizontal: 20,
+    marginBottom: 20,
+    marginTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#e0e0e0',
+  },
+  summaryRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 15,
-    paddingHorizontal: 20,
-    backgroundColor: '#fff',
-    borderRadius: 10,
-    marginBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    paddingVertical: 4,
   },
-  totalText: {
-    fontSize: 20,
-    fontWeight: '600',
+  summaryLabel: {
+    fontSize: 16,
+    fontFamily: 'Inter-SemiBold',
     color: '#333',
   },
-  totalAmount: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: '#007AFF',
+  summaryValue: {
+    fontSize: 16,
+    fontFamily: 'Inter-Bold',
+    color: '#333',
   },
   buttonContainer: {
-    marginBottom: 15,
+    marginTop: 10,
+  },
+  submitButton: {
+    backgroundColor: '#39b878',
+    borderRadius: 50,
+    paddingVertical: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  submitButtonDisabled: {
+    backgroundColor: '#a5d6a7',
+  },
+  submitButtonText: {
+    fontSize: 16,
+    fontFamily: 'Inter-Bold',
+    color: '#fff',
   },
   centered: {
     flex: 1,

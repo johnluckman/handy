@@ -142,11 +142,8 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 10,
     marginBottom: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
   },
   denominationInfo: {
     flexDirection: 'row',
@@ -184,7 +181,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   icon: {
-    marginRight: 4,
+    // marginRight: 4, // Removed to bring icon and text closer
   },
   label: {
     fontSize: 12,
@@ -201,7 +198,7 @@ const styles = StyleSheet.create({
   },
   readOnlyInput: {
     backgroundColor: '#f0f0f0',
-    color: '#333',
+    color: '#aaa',
   },
   owedInput: {
     backgroundColor: '#ffcdd2', // A light red background

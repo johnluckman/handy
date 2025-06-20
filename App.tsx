@@ -1,9 +1,14 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import NetInfo from '@react-native-community/netinfo';
 import AppNavigator from './src/navigation/AppNavigator';
 import { getQueue, updateQueue, QueuedSubmission } from './src/services/queueService';
 import { appendToSheet } from './src/services/googleSheets';
 import { QueueContext } from './src/context/QueueContext';
+import { useFonts } from 'expo-font';
+import * as SplashScreen from 'expo-splash-screen';
+import { View } from 'react-native';
+
+SplashScreen.preventAutoHideAsync();
 
 /**
  * This component will provide queue state to the app and handle synchronization.
@@ -88,12 +93,30 @@ const QueueProvider: React.FC<{children: React.ReactNode}> = ({ children }) => {
 }
 
 /**
- * @returns {React.ReactElement} The root application component.
+ * @returns {React.ReactElement | null} The root application component.
  */
-export default function App(): React.ReactElement {
+export default function App(): React.ReactElement | null {
+  const [fontsLoaded, fontError] = useFonts({
+    'Inter-Regular': require('./src/assets/fonts/Inter-Regular.ttf'),
+    'Inter-SemiBold': require('./src/assets/fonts/Inter-SemiBold.ttf'),
+    'Inter-Bold': require('./src/assets/fonts/Inter-Bold.ttf'),
+  });
+
+  const onLayoutRootView = useCallback(async () => {
+    if (fontsLoaded || fontError) {
+      await SplashScreen.hideAsync();
+    }
+  }, [fontsLoaded, fontError]);
+
+  if (!fontsLoaded && !fontError) {
+    return null;
+  }
+
   return (
-    <QueueProvider>
-      <AppNavigator />
-    </QueueProvider>
+    <View style={{ flex: 1 }} onLayout={onLayoutRootView}>
+      <QueueProvider>
+        <AppNavigator />
+      </QueueProvider>
+    </View>
   );
 }
