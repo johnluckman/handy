@@ -1,66 +1,90 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import NetInfo from '@react-native-community/netinfo';
 import AppNavigator from './src/navigation/AppNavigator';
-import { getQueue, updateQueue } from './src/services/queueService';
+import { getQueue, updateQueue, QueuedSubmission } from './src/services/queueService';
 import { appendToSheet } from './src/services/googleSheets';
+import { QueueContext } from './src/context/QueueContext';
 
 /**
- * This component will handle the background synchronization of the offline queue.
+ * This component will provide queue state to the app and handle synchronization.
  */
-const SyncProvider: React.FC<{children: React.ReactNode}> = ({ children }) => {
-  const syncQueue = async () => {
-    console.log('[SyncProvider] Checking for items to sync...');
-    let queue = await getQueue();
+const QueueProvider: React.FC<{children: React.ReactNode}> = ({ children }) => {
+  const [queue, setQueue] = useState<QueuedSubmission[]>([]);
 
-    if (queue.length === 0) {
-      console.log('[SyncProvider] Queue is empty. Nothing to sync.');
-      return;
+  const refreshQueue = async () => {
+    const currentQueue = await getQueue();
+    setQueue(currentQueue);
+  };
+
+  const syncQueue = async () => {
+    const netState = await NetInfo.fetch();
+    if (!netState.isConnected) {
+      console.log('[QueueProvider] Sync deferred: App is offline.');
+      return { success: true, owedData: null };
+    }
+    
+    console.log('[QueueProvider] Attempting to sync...');
+    
+    const queueToProcess = await getQueue();
+
+    if (queueToProcess.length === 0) {
+      console.log('[QueueProvider] Queue is empty, nothing to sync.');
+      return { success: true, owedData: null };
     }
 
-    console.log(`[SyncProvider] Found ${queue.length} items to sync.`);
-    
-    // Process the queue one by one
-    while (queue.length > 0) {
-      const currentItem = queue[0];
+    let itemsChanged = false;
+    let lastOwedData: any | null = null;
+
+    while (queueToProcess.length > 0) {
+      const currentItem = queueToProcess[0];
       try {
         const result = await appendToSheet(currentItem.payload);
         if (result.success) {
-          console.log(`[SyncProvider] Successfully synced item ${currentItem.id}.`);
-          // Remove the successfully synced item from the front of the queue
-          queue.shift();
-          await updateQueue(queue);
+          console.log(`[QueueProvider] Successfully synced item ${currentItem.id}.`);
+          queueToProcess.shift();
+          itemsChanged = true;
+          if (result.owedData) {
+            lastOwedData = result.owedData;
+          }
         } else {
-          console.error(`[SyncProvider] Failed to sync item ${currentItem.id}. Server indicated failure. Will retry later.`, result.message);
-          // Stop processing this cycle to avoid getting stuck on a failing item
+          console.error(`[QueueProvider] Server error on item ${currentItem.id}. Halting sync.`, result.message);
           break;
         }
       } catch (error) {
-        console.error(`[SyncProvider] Network error while syncing item ${currentItem.id}. Will retry later.`, error);
-        // Stop processing, likely offline
+        console.error(`[QueueProvider] Network error on item ${currentItem.id}. Halting sync.`, error);
         break;
       }
     }
+
+    if (itemsChanged) {
+      await updateQueue(queueToProcess);
+      setQueue(queueToProcess);
+    }
+    
+    return { success: itemsChanged, owedData: lastOwedData };
   };
 
   useEffect(() => {
-    // Subscribe to network state changes
+    // Initial load
+    refreshQueue();
+
     const unsubscribe = NetInfo.addEventListener(state => {
-      console.log('[SyncProvider] Network state changed. Is connected?', state.isConnected);
       if (state.isConnected) {
+        // We still sync on connection change, e.g., for coming back online
         syncQueue();
       }
     });
 
-    // Run a sync check when the app starts
-    syncQueue();
-
-    // Unsubscribe when the component unmounts
     return () => {
       unsubscribe();
     };
-  }, []);
+  }, []); // This dependency array should be correct now
 
-  return <>{children}</>;
+  return (
+    <QueueContext.Provider value={{ queue, refreshQueue, syncQueue }}>
+      {children}
+    </QueueContext.Provider>
+  );
 }
 
 /**
@@ -68,8 +92,8 @@ const SyncProvider: React.FC<{children: React.ReactNode}> = ({ children }) => {
  */
 export default function App(): React.ReactElement {
   return (
-    <SyncProvider>
+    <QueueProvider>
       <AppNavigator />
-    </SyncProvider>
+    </QueueProvider>
   );
 }

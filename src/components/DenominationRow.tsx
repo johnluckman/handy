@@ -59,6 +59,7 @@ export default function DenominationRow({ denomination, rowData, onRowDataChange
             value={rowData.actualCount.toString()}
             onChangeText={(text) => handleInputChange('actualCount', text)}
             placeholder="0"
+            selectTextOnFocus={true}
           />
           <Text style={styles.valueText}>{`$${actualValue.toFixed(2)}`}</Text>
         </View>
@@ -75,6 +76,7 @@ export default function DenominationRow({ denomination, rowData, onRowDataChange
             onChangeText={(text) => handleInputChange('targetFloat', text)}
             placeholder="0"
             editable={denomination.value !== 100}
+            selectTextOnFocus={true}
           />
           <Text style={styles.valueText}>{`$${targetValue.toFixed(2)}`}</Text>
         </View>
@@ -92,6 +94,7 @@ export default function DenominationRow({ denomination, rowData, onRowDataChange
             onChangeText={(text) => handleInputChange('borrow', text)}
             placeholder="0"
             editable={denomination.value !== 100}
+            selectTextOnFocus={true}
           />
         </View>
 
@@ -125,6 +128,7 @@ export default function DenominationRow({ denomination, rowData, onRowDataChange
             onChangeText={(text) => handleInputChange('returned', text)}
             placeholder="0"
             editable={denomination.value !== 100}
+            selectTextOnFocus={true}
           />
         </View>
       </View>

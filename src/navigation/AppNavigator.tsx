@@ -20,16 +20,20 @@ const Stack = createStackNavigator<RootStackParamList>();
 export default function AppNavigator(): React.ReactElement {
   return (
     <NavigationContainer>
-      <Stack.Navigator initialRouteName="Dashboard">
+      <Stack.Navigator 
+        initialRouteName="Dashboard"
+        screenOptions={{
+          headerShown: false,
+          cardStyle: { flex: 1 },
+        }}
+      >
         <Stack.Screen 
           name="Dashboard" 
           component={DashboardScreen}
-          options={{ title: 'Handy Toolkit' }} 
         />
         <Stack.Screen 
           name="CashCounter" 
           component={CashCounterScreen} 
-          options={{ title: 'Cash Counter' }} 
         />
       </Stack.Navigator>
     </NavigationContainer>

@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, Button, Alert, TextInput, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Button, Alert, TextInput, ActivityIndicator, Platform, TouchableWithoutFeedback, Keyboard } from 'react-native';
 import NetInfo, { useNetInfo } from '@react-native-community/netinfo';
+import { LinearGradient } from 'expo-linear-gradient';
 import DenominationRow, { RowData } from '../components/DenominationRow';
 import { denominations, Denomination } from '../utils/denominations';
 import { appendToSheet, testConnection, getInitialOwedData } from '../services/googleSheets';
-import { addToQueue, getQueue, QueuedSubmission } from '../services/queueService';
+import { addToQueue } from '../services/queueService';
+import { useQueue } from '../context/QueueContext'; // Corrected import path
 
 // Defines the structure for our state, mapping each denomination ID to its RowData
 interface DenominationData {
@@ -35,21 +37,8 @@ export default function CashCounterScreen(): React.ReactElement {
   const [isTesting, setIsTesting] = React.useState(false);
   const [userName, setUserName] = React.useState('');
   const [notes, setNotes] = React.useState('');
-  const [queueSize, setQueueSize] = React.useState(0);
   const netInfo = useNetInfo();
-
-  // Periodically check the queue size to update the UI
-  useEffect(() => {
-    const updateQueueSize = async () => {
-      const queue = await getQueue();
-      setQueueSize(queue.length);
-    };
-    
-    updateQueueSize(); // Initial check
-    const interval = setInterval(updateQueueSize, 3000); // Check every 3 seconds
-
-    return () => clearInterval(interval);
-  }, []);
+  const queueContext = useQueue();
 
   const handleRowDataChange = (id: string, newRowData: RowData) => {
     setData(prevData => ({
@@ -86,7 +75,23 @@ export default function CashCounterScreen(): React.ReactElement {
   };
 
   const handleClearForm = () => {
-    setData(initializeState());
+    setData(prevData => {
+      const clearedData = { ...prevData };
+      // Loop through each denomination in the state
+      for (const id in clearedData) {
+        // Keep the existing server-driven data ('owed' and 'targetFloat')
+        // and only reset the user-input fields.
+        clearedData[id] = {
+          ...clearedData[id],
+          actualCount: 0,
+          returned: 0,
+          // Automatically recalculate the borrow amount based on the cleared count
+          borrow: Math.max(0, clearedData[id].targetFloat - 0),
+        };
+      }
+      return clearedData;
+    });
+    // Also clear the general text inputs
     setUserName('');
     setNotes('');
   }
@@ -97,16 +102,37 @@ export default function CashCounterScreen(): React.ReactElement {
 
     const flatData = denominations.flatMap(d => {
       const row = data[d.id];
-      // We no longer send 'owed' from the app, the sheet calculates it.
-      return [row.actualCount, row.targetFloat, row.borrow, row.returned]; 
+      return [row.actualCount, row.targetFloat, row.borrow, row.returned];
     });
 
     const rowData = [ date, userName, notes, total, ...flatData ];
 
     try {
+      // 1. Add to storage
       await addToQueue(rowData);
-      Alert.alert('Submission Saved', 'Your cash count has been saved and will be uploaded automatically when you are online.');
-      handleClearForm(); // Reset the form after saving
+      
+      // 2. Trigger the sync and get the result
+      const syncResult = await queueContext.syncQueue();
+      
+      // 3. Update the UI with the new "Owed" data if the sync was successful
+      if (syncResult.success && syncResult.owedData) {
+        setData(prevData => {
+            const updatedData = { ...prevData };
+            for (const id in syncResult.owedData) {
+                if (updatedData[id]) {
+                    updatedData[id] = { ...updatedData[id], owed: syncResult.owedData[id] };
+                }
+            }
+            return updatedData;
+        });
+        Alert.alert('Success', 'Submission synced successfully!');
+      } else {
+        Alert.alert('Submission Saved', 'Your count has been saved and will sync next time you are online.');
+      }
+
+      // 4. Clear the user-input parts of the form
+      handleClearForm();
+
     } catch (error: any) {
       Alert.alert('Error', 'There was an error saving your submission. Please try again.');
     } finally {
@@ -143,6 +169,8 @@ export default function CashCounterScreen(): React.ReactElement {
     fetchInitialData();
   }, []);
 
+  const queueSize = queueContext.queue.length;
+
   if (isLoading && !isTesting) {
     return (
       <View style={styles.centered}>
@@ -153,87 +181,126 @@ export default function CashCounterScreen(): React.ReactElement {
   }
 
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.statusContainer}>
-        <Text style={[styles.statusText, { color: netInfo.isConnected ? 'green' : 'red' }]}>
-          {netInfo.isConnected ? '● Online' : '● Offline'}
-        </Text>
-        {queueSize > 0 && (
-          <Text style={styles.queueText}>
-            {queueSize} item(s) waiting to sync
+    <View style={styles.screen}>
+      <LinearGradient
+        colors={['#39b878', '#2E9A65']} // Your specified color fading to a darker shade
+        style={styles.header}
+      >
+        <View style={styles.headerLeft}>
+          <View style={styles.logoPlaceholder} />
+          <Text style={styles.headerTitle}>Cash Counter</Text>
+        </View>
+        <View style={styles.headerRight}>
+          <Text style={styles.statusText}>
+            <Text style={{ color: netInfo.isConnected ? '#dcedc8' : '#ffcdd2' }}>● </Text>
+            {netInfo.isConnected ? 'Online' : 'Offline'}
           </Text>
-        )}
-      </View>
+          {queueSize > 0 && (
+            <Text style={styles.queueText}>
+              {queueSize} pending
+            </Text>
+          )}
+        </View>
+      </LinearGradient>
 
-      <Text style={styles.title}>Cash Count</Text>
-      
-      <View style={styles.userInputsContainer}>
-        <TextInput
-          style={styles.textInput}
-          placeholder="Your Name"
-          value={userName}
-          onChangeText={setUserName}
-        />
-        <TextInput
-          style={styles.textInput}
-          placeholder="Add notes (e.g., End of Day Till 1)"
-          value={notes}
-          onChangeText={setNotes}
-        />
-      </View>
-      
-      <View style={styles.list}>
-        {denominations.map((item: Denomination) => (
-          <DenominationRow
-            key={item.id}
-            denomination={item}
-            rowData={data[item.id]}
-            onRowDataChange={handleRowDataChange}
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+        <ScrollView
+          style={styles.container}
+          contentContainerStyle={styles.contentContainer}
+          keyboardShouldPersistTaps="handled"
+        >
+          {/* <Text style={styles.title}>Cash Count</Text> */}
+
+          <View style={styles.userInputsContainer}>
+            <TextInput
+              style={styles.textInput}
+              placeholder="Your Name"
+              value={userName}
+              onChangeText={setUserName}
+            />
+            <TextInput
+              style={styles.textInput}
+              placeholder="Add notes (e.g., End of Day Till 1)"
+              value={notes}
+              onChangeText={setNotes}
+            />
+          </View>
+
+          <View style={styles.list}>
+            {denominations.map((item: Denomination) => (
+              <DenominationRow
+                key={item.id}
+                denomination={item}
+                rowData={data[item.id]}
+                onRowDataChange={handleRowDataChange}
+              />
+            ))}
+          </View>
+
+          <View style={styles.summaryContainer}>
+            <Text style={styles.totalText}>Count Total:</Text>
+            <Text style={styles.totalAmount}>{`$${total.toFixed(2)}`}</Text>
+          </View>
+
+          <Button
+            title={isLoading ? 'Submitting...' : 'Submit Count'}
+            onPress={handleSubmit}
+            disabled={isLoading || isTesting}
           />
-        ))}
-      </View>
-      
-      <View style={styles.summaryContainer}>
-        <Text style={styles.totalText}>Count Total:</Text>
-        <Text style={styles.totalAmount}>{`$${total.toFixed(2)}`}</Text>
-      </View>
-      
-      <View style={styles.buttonContainer}>
-        <Button 
-          title={isTesting ? 'Testing...' : 'Test Connection'} 
-          onPress={handleTestConnection} 
-          disabled={isTesting || isLoading}
-          color="#888"
-        />
-      </View>
-      
-      <Button 
-        title={isLoading ? 'Submitting...' : 'Submit Count'} 
-        onPress={handleSubmit} 
-        disabled={isLoading || isTesting} 
-      />
-    </ScrollView>
+        </ScrollView>
+      </TouchableWithoutFeedback>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  screen: {
+    flex: 1,
+    backgroundColor: '#f5f5f5', // The main background is now the card color
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between', // Pushes left and right sides apart
+    paddingHorizontal: 20,
+    paddingTop: 50,
+    paddingBottom: 20,
+  },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  headerRight: {
+    alignItems: 'flex-end', // Aligns status text to the right
+  },
+  logoPlaceholder: {
+    width: 40,
+    height: 40,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    marginRight: 15,
+  },
+  headerTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#ffffff',
+  },
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
-    padding: 10,
+    // The container no longer needs a background color, as the screen provides it
   },
-  statusContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 10,
-    backgroundColor: '#eee',
+  contentContainer: {
+    padding: 20,
+    paddingBottom: 60,
   },
   statusText: {
     fontWeight: 'bold',
+    fontSize: 14,
+    color: '#ffffff', // White text for better contrast on the gradient
   },
   queueText: {
-    color: '#666',
+    color: '#e0e0e0', // A slightly dimmer white for the sub-text
+    fontSize: 12,
   },
   title: {
     fontSize: 28,
@@ -241,7 +308,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     color: '#333',
     textAlign: 'center',
-    marginTop: 20,
+    marginTop: 10,
   },
   userInputsContainer: {
     marginBottom: 15,
