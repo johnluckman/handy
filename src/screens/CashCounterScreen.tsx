@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, Button, Alert, TextInput, ActivityIndicator } from 'react-native';
+import NetInfo, { useNetInfo } from '@react-native-community/netinfo';
 import DenominationRow, { RowData } from '../components/DenominationRow';
 import { denominations, Denomination } from '../utils/denominations';
 import { appendToSheet, testConnection, getInitialOwedData } from '../services/googleSheets';
+import { addToQueue, getQueue, QueuedSubmission } from '../services/queueService';
 
 // Defines the structure for our state, mapping each denomination ID to its RowData
 interface DenominationData {
@@ -33,6 +35,21 @@ export default function CashCounterScreen(): React.ReactElement {
   const [isTesting, setIsTesting] = React.useState(false);
   const [userName, setUserName] = React.useState('');
   const [notes, setNotes] = React.useState('');
+  const [queueSize, setQueueSize] = React.useState(0);
+  const netInfo = useNetInfo();
+
+  // Periodically check the queue size to update the UI
+  useEffect(() => {
+    const updateQueueSize = async () => {
+      const queue = await getQueue();
+      setQueueSize(queue.length);
+    };
+    
+    updateQueueSize(); // Initial check
+    const interval = setInterval(updateQueueSize, 3000); // Check every 3 seconds
+
+    return () => clearInterval(interval);
+  }, []);
 
   const handleRowDataChange = (id: string, newRowData: RowData) => {
     setData(prevData => ({
@@ -68,6 +85,12 @@ export default function CashCounterScreen(): React.ReactElement {
     }
   };
 
+  const handleClearForm = () => {
+    setData(initializeState());
+    setUserName('');
+    setNotes('');
+  }
+
   const handleSubmit = async () => {
     setIsLoading(true);
     const date = new Date().toISOString();
@@ -81,28 +104,11 @@ export default function CashCounterScreen(): React.ReactElement {
     const rowData = [ date, userName, notes, total, ...flatData ];
 
     try {
-      const result = await appendToSheet(rowData);
-      
-      if (result.success && result.owedData) {
-        Alert.alert('Success', 'Cash count successfully submitted!');
-        
-        // Update the state with the new "Owed" values from the sheet
-        const newOwedData = result.owedData;
-        setData(prevData => {
-          const updatedData = { ...prevData };
-          for (const id in newOwedData) {
-            if (updatedData[id]) {
-              updatedData[id].owed = newOwedData[id];
-            }
-          }
-          return updatedData;
-        });
-
-      } else {
-        throw new Error(result.message || 'Submission failed. Please check the logs.');
-      }
+      await addToQueue(rowData);
+      Alert.alert('Submission Saved', 'Your cash count has been saved and will be uploaded automatically when you are online.');
+      handleClearForm(); // Reset the form after saving
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'There was an error submitting the count.');
+      Alert.alert('Error', 'There was an error saving your submission. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -148,6 +154,17 @@ export default function CashCounterScreen(): React.ReactElement {
 
   return (
     <ScrollView style={styles.container}>
+      <View style={styles.statusContainer}>
+        <Text style={[styles.statusText, { color: netInfo.isConnected ? 'green' : 'red' }]}>
+          {netInfo.isConnected ? '● Online' : '● Offline'}
+        </Text>
+        {queueSize > 0 && (
+          <Text style={styles.queueText}>
+            {queueSize} item(s) waiting to sync
+          </Text>
+        )}
+      </View>
+
       <Text style={styles.title}>Cash Count</Text>
       
       <View style={styles.userInputsContainer}>
@@ -204,6 +221,19 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f5f5f5',
     padding: 10,
+  },
+  statusContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 10,
+    backgroundColor: '#eee',
+  },
+  statusText: {
+    fontWeight: 'bold',
+  },
+  queueText: {
+    color: '#666',
   },
   title: {
     fontSize: 28,

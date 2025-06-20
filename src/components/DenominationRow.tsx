@@ -69,11 +69,12 @@ export default function DenominationRow({ denomination, rowData, onRowDataChange
             <Text style={styles.label}>{`Float (${denomination.targetCount})`}</Text>
           </View>
           <TextInput
-            style={styles.input}
+            style={[styles.input, denomination.value === 100 && styles.disabledInput]}
             keyboardType="number-pad"
             value={rowData.targetFloat.toString()}
             onChangeText={(text) => handleInputChange('targetFloat', text)}
             placeholder="0"
+            editable={denomination.value !== 100}
           />
           <Text style={styles.valueText}>{`$${targetValue.toFixed(2)}`}</Text>
         </View>
@@ -85,11 +86,12 @@ export default function DenominationRow({ denomination, rowData, onRowDataChange
             <Text style={styles.label}>Borrow</Text>
           </View>
           <TextInput
-            style={styles.input}
+            style={[styles.input, denomination.value === 100 && styles.disabledInput]}
             keyboardType="number-pad"
             value={rowData.borrow.toString()}
             onChangeText={(text) => handleInputChange('borrow', text)}
             placeholder="0"
+            editable={denomination.value !== 100}
           />
         </View>
 
@@ -117,11 +119,12 @@ export default function DenominationRow({ denomination, rowData, onRowDataChange
             <Text style={styles.label}>Returned</Text>
           </View>
           <TextInput
-            style={styles.input}
+            style={[styles.input, denomination.value === 100 && styles.disabledInput]}
             keyboardType="number-pad"
             value={rowData.returned.toString()}
             onChangeText={(text) => handleInputChange('returned', text)}
             placeholder="0"
+            editable={denomination.value !== 100}
           />
         </View>
       </View>
@@ -200,6 +203,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffcdd2', // A light red background
     color: '#c62828', // A dark red text color
     fontWeight: 'bold',
+  },
+  disabledInput: {
+    backgroundColor: '#f0f0f0',
+    color: '#aaa',
   },
   valueText: {
     fontSize: 12,
