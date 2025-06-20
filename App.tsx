@@ -1,6 +1,9 @@
 import React from 'react';
-import DashboardScreen from './src/screens/DashboardScreen';
+import AppNavigator from './src/navigation/AppNavigator';
 
-export default function App() {
-  return <DashboardScreen />;
+/**
+ * @returns {React.ReactElement} The root application component.
+ */
+export default function App(): React.ReactElement {
+  return <AppNavigator />;
 }

@@ -1,5 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, FlatList } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import { NavigationProps } from '../navigation/AppNavigator';
 
 const tools = [
   { id: '1', name: 'Cash Counter' },
@@ -9,9 +11,21 @@ const tools = [
   { id: '5', name: 'Brand Info' },
 ];
 
-export default function DashboardScreen() {
+/**
+ * @returns {React.ReactElement} The main dashboard screen component.
+ */
+export default function DashboardScreen(): React.ReactElement {
+  const navigation = useNavigation<NavigationProps>();
+
+  const handlePress = (toolName: string) => {
+    if (toolName === 'Cash Counter') {
+      navigation.navigate('CashCounter');
+    }
+    // Add navigation for other tools here
+  };
+
   const renderTool = ({ item }: { item: { id: string; name: string } }) => (
-    <TouchableOpacity style={styles.toolButton}>
+    <TouchableOpacity style={styles.toolButton} onPress={() => handlePress(item.name)}>
       <Text style={styles.toolText}>{item.name}</Text>
     </TouchableOpacity>
   );
