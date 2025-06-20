@@ -15,7 +15,8 @@
 
 // Configuration - UPDATE THIS WITH YOUR ACTUAL SHEET ID
 const SPREADSHEET_ID = '1RDRzIO8XLQXAsY_GdvgOLlUyk0Fnz5Bqc4IrEASiYok';
-const SHEET_NAME = 'Log'; // Change if your sheet has a different name
+const LOG_SHEET_NAME = 'Log';
+const SUMMARY_SHEET_NAME = 'Safe';
 
 /**
  * Handles browser visits to the URL gracefully.
@@ -51,15 +52,21 @@ function doPost(e) {
     }
     Logger.log('Data format is valid.');
     
-    const result = appendToSheet(data.data);
-    Logger.log('Data successfully appended to sheet. Result: ' + JSON.stringify(result));
+    // 1. Append the new row to the Log sheet
+    const appendResult = appendToLogSheet(data.data);
+    Logger.log('Data successfully appended to Log sheet. Result: ' + JSON.stringify(appendResult));
     
+    // 2. Read the summary "Owed" data from the Safe sheet
+    const owedData = getOwedData();
+    Logger.log('Successfully read owed data from Safe sheet: ' + JSON.stringify(owedData));
+
+    // 3. Return a combined success response
     Logger.log('Creating success response...');
     return createResponse(200, 'Data appended successfully', {
       success: true,
-      message: 'Data appended successfully',
-      timestamp: new Date().toISOString(),
-      rowsAdded: result.rowsAdded
+      message: 'Data appended and summary returned.',
+      rowsAdded: appendResult.rowsAdded,
+      owedData: owedData // Pass the owed data back to the app
     });
     
   } catch (error) {
@@ -80,19 +87,19 @@ function doPost(e) {
 }
 
 /**
- * Appends a row of data to the Google Sheet
+ * Appends a row of data to the Log Sheet
  */
-function appendToSheet(rowData) {
-  Logger.log('appendToSheet called with rowData: ' + JSON.stringify(rowData));
+function appendToLogSheet(rowData) {
+  Logger.log('appendToLogSheet called with rowData: ' + JSON.stringify(rowData));
   const spreadsheet = SpreadsheetApp.openById(SPREADSHEET_ID);
   Logger.log('Spreadsheet opened successfully.');
-  const sheet = spreadsheet.getSheetByName(SHEET_NAME);
+  const sheet = spreadsheet.getSheetByName(LOG_SHEET_NAME);
   
   if (!sheet) {
-    Logger.log('Error: Sheet "' + SHEET_NAME + '" not found.');
-    throw new Error('Sheet "' + SHEET_NAME + '" not found');
+    Logger.log('Error: Sheet "' + LOG_SHEET_NAME + '" not found.');
+    throw new Error('Sheet "' + LOG_SHEET_NAME + '" not found');
   }
-  Logger.log('Sheet "' + SHEET_NAME + '" found.');
+  Logger.log('Sheet "' + LOG_SHEET_NAME + '" found.');
   
   const lastRow = sheet.getLastRow();
   Logger.log('Last row is: ' + lastRow);
@@ -105,6 +112,31 @@ function appendToSheet(rowData) {
     rowsAdded: 1,
     rowNumber: lastRow + 1
   };
+}
+
+/**
+ * Reads the "Owed" data from the "Safe" summary sheet.
+ */
+function getOwedData() {
+  const spreadsheet = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const summarySheet = spreadsheet.getSheetByName(SUMMARY_SHEET_NAME);
+  if (!summarySheet) {
+    Logger.log('Error: Summary sheet "' + SUMMARY_SHEET_NAME + '" not found.');
+    throw new Error('Summary sheet "' + SUMMARY_SHEET_NAME + '" not found');
+  }
+
+  // Reads the values from B2 to L2.
+  // The range is 1 row, 11 columns, starting at row 2, column 2.
+  const owedValues = summarySheet.getRange(2, 2, 1, 11).getValues()[0];
+
+  // Map the array of values to a structured object for easier use in the app
+  const denominationIds = ['100', '50', '20', '10', '5', '2', '1', '0.50', '0.20', '0.10', '0.05'];
+  const owedDataObject = {};
+  denominationIds.forEach((id, index) => {
+    owedDataObject[id] = owedValues[index] || 0; // Default to 0 if cell is empty
+  });
+
+  return owedDataObject;
 }
 
 /**
@@ -142,7 +174,7 @@ function testAppend() {
   ];
   
   try {
-    const result = appendToSheet(testData);
+    const result = appendToLogSheet(testData);
     console.log('Test successful:', result);
   } catch (error) {
     console.error('Test failed:', error);
@@ -155,7 +187,7 @@ function testAppend() {
 function getSheetInfo() {
   try {
     const spreadsheet = SpreadsheetApp.openById(SPREADSHEET_ID);
-    const sheet = spreadsheet.getSheetByName(SHEET_NAME);
+    const sheet = spreadsheet.getSheetByName(LOG_SHEET_NAME);
     
     return {
       spreadsheetName: spreadsheet.getName(),

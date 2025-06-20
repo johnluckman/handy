@@ -16,8 +16,9 @@ const initializeState = (): DenominationData => {
     initialState[d.id] = {
       actualCount: 0,
       targetFloat: d.targetCount,
-      borrow: d.targetCount, // Initially, borrow is target since actual is 0
+      borrow: d.targetCount,
       returned: 0,
+      owed: 0, // Initialize 'owed' to 0
     };
   });
   return initialState;
@@ -30,7 +31,7 @@ export default function CashCounterScreen(): React.ReactElement {
   const [data, setData] = React.useState<DenominationData>(initializeState);
   const [isLoading, setIsLoading] = React.useState(false);
   const [isTesting, setIsTesting] = React.useState(false);
-  const [userName, setUserName] = React.useState('DefaultUser');
+  const [userName, setUserName] = React.useState('');
   const [notes, setNotes] = React.useState('');
 
   const handleRowDataChange = (id: string, newRowData: RowData) => {
@@ -49,43 +50,6 @@ export default function CashCounterScreen(): React.ReactElement {
   
   const total = calculateTotal();
 
-  const handleSubmit = async () => {
-    setIsLoading(true);
-    const date = new Date().toISOString();
-
-    // Flatten the data for the sheet row
-    const rowData = [
-      date,
-      userName,
-      notes,
-      total,
-      // Add all data points for each denomination
-      ...denominations.flatMap(d => {
-        const row = data[d.id];
-        return [row.actualCount, row.targetFloat, row.borrow, row.returned, 0]; // 0 is a placeholder for "Still Owed"
-      })
-    ];
-
-    try {
-      const result = await appendToSheet(rowData);
-      if (result && result.data && result.data.success) {
-        Alert.alert('Success', 'Cash count successfully submitted to Google Sheets!',
-          [{ text: 'OK', onPress: () => setData(initializeState) }]
-        );
-      } else {
-        throw new Error(result.message || 'Submission failed. Please check the logs.');
-      }
-    } catch (error: any) {
-      Alert.alert('Error', error.message || 'There was an error submitting the count.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-  
-  // Also, add headers for the new columns in your Google Sheet:
-  // Date, User, Notes, Total, 100_Actual, 100_Target, 100_Borrow, 100_Returned, 100_Owed, 50_Actual, ...etc.
-
-
   const handleTestConnection = async () => {
     console.warn('🧪 Test connection button pressed');
     setIsTesting(true);
@@ -101,6 +65,46 @@ export default function CashCounterScreen(): React.ReactElement {
       Alert.alert('Error', 'Connection test failed. Check console for details.');
     } finally {
       setIsTesting(false);
+    }
+  };
+
+  const handleSubmit = async () => {
+    setIsLoading(true);
+    const date = new Date().toISOString();
+
+    const flatData = denominations.flatMap(d => {
+      const row = data[d.id];
+      // We no longer send 'owed' from the app, the sheet calculates it.
+      return [row.actualCount, row.targetFloat, row.borrow, row.returned]; 
+    });
+
+    const rowData = [ date, userName, notes, total, ...flatData ];
+
+    try {
+      const result = await appendToSheet(rowData);
+      
+      if (result && result.data && result.data.success && result.data.owedData) {
+        Alert.alert('Success', 'Cash count successfully submitted!');
+        
+        // Update the state with the new "Owed" values from the sheet
+        const newOwedData = result.data.owedData;
+        setData(prevData => {
+          const updatedData = { ...prevData };
+          for (const id in newOwedData) {
+            if (updatedData[id]) {
+              updatedData[id].owed = newOwedData[id];
+            }
+          }
+          return updatedData;
+        });
+
+      } else {
+        throw new Error(result.message || 'Submission failed. Please check the logs.');
+      }
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'There was an error submitting the count.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
