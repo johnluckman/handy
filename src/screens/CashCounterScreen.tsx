@@ -1,8 +1,8 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView, Button, Alert, TextInput } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import { View, Text, StyleSheet, ScrollView, Button, Alert, TextInput, ActivityIndicator } from 'react-native';
 import DenominationRow, { RowData } from '../components/DenominationRow';
 import { denominations, Denomination } from '../utils/denominations';
-import { appendToSheet, testConnection } from '../services/googleSheets';
+import { appendToSheet, testConnection, getInitialOwedData } from '../services/googleSheets';
 
 // Defines the structure for our state, mapping each denomination ID to its RowData
 interface DenominationData {
@@ -29,7 +29,7 @@ const initializeState = (): DenominationData => {
  */
 export default function CashCounterScreen(): React.ReactElement {
   const [data, setData] = React.useState<DenominationData>(initializeState);
-  const [isLoading, setIsLoading] = React.useState(false);
+  const [isLoading, setIsLoading] = React.useState(true);
   const [isTesting, setIsTesting] = React.useState(false);
   const [userName, setUserName] = React.useState('');
   const [notes, setNotes] = React.useState('');
@@ -83,11 +83,11 @@ export default function CashCounterScreen(): React.ReactElement {
     try {
       const result = await appendToSheet(rowData);
       
-      if (result && result.data && result.data.success && result.data.owedData) {
+      if (result.success && result.owedData) {
         Alert.alert('Success', 'Cash count successfully submitted!');
         
         // Update the state with the new "Owed" values from the sheet
-        const newOwedData = result.data.owedData;
+        const newOwedData = result.owedData;
         setData(prevData => {
           const updatedData = { ...prevData };
           for (const id in newOwedData) {
@@ -107,6 +107,44 @@ export default function CashCounterScreen(): React.ReactElement {
       setIsLoading(false);
     }
   };
+
+  // Fetch initial owed data when the component mounts
+  useEffect(() => {
+    const fetchInitialData = async () => {
+      console.log("Attempting to fetch initial owed data...");
+      setIsLoading(true);
+      const result = await getInitialOwedData();
+      if (result.success && result.owedData) {
+        console.log("Successfully fetched initial owed data:", result.owedData);
+        // MERGE the fetched owedData into the main data state
+        setData(prevData => {
+            const updatedData = { ...prevData };
+            for (const id in result.owedData) {
+                if (updatedData[id]) {
+                    updatedData[id] = { ...updatedData[id], owed: result.owedData[id] };
+                }
+            }
+            console.log("Updated data state with initial owed values:", updatedData);
+            return updatedData;
+        });
+      } else {
+        console.error("Failed to fetch or parse initial data:", result.message);
+        Alert.alert("Error", "Could not load initial data from the sheet. Please check your connection and try again.");
+      }
+      setIsLoading(false);
+    };
+
+    fetchInitialData();
+  }, []);
+
+  if (isLoading && !isTesting) {
+    return (
+      <View style={styles.centered}>
+        <ActivityIndicator size="large" color="#007AFF" />
+        <Text>Loading from Sheet...</Text>
+      </View>
+    );
+  }
 
   return (
     <ScrollView style={styles.container}>
@@ -217,5 +255,10 @@ const styles = StyleSheet.create({
   },
   buttonContainer: {
     marginBottom: 15,
+  },
+  centered: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 }); 

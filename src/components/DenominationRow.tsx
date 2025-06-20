@@ -100,8 +100,12 @@ export default function DenominationRow({ denomination, rowData, onRowDataChange
             <Text style={styles.label}>Owed</Text>
           </View>
           <TextInput
-            style={[styles.input, styles.readOnlyInput]}
-            value={rowData.owed.toString()}
+            style={[
+              styles.input,
+              styles.readOnlyInput,
+              rowData.owed > 0 && styles.owedInput,
+            ]}
+            value={rowData.owed > 0 ? `-${rowData.owed}` : '0'}
             editable={false}
           />
         </View>
@@ -191,6 +195,11 @@ const styles = StyleSheet.create({
   readOnlyInput: {
     backgroundColor: '#f0f0f0',
     color: '#333',
+  },
+  owedInput: {
+    backgroundColor: '#ffcdd2', // A light red background
+    color: '#c62828', // A dark red text color
+    fontWeight: 'bold',
   },
   valueText: {
     fontSize: 12,

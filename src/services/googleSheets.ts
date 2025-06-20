@@ -1,7 +1,7 @@
 import { GOOGLE_SHEET_ID } from '@env';
 
 // Configuration - UPDATE THIS WITH YOUR GOOGLE APPS SCRIPT WEB APP URL
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyKCALk9WJ_ATzrXrrkvj1Zya9-Y4VmAjVS1eARZkFvCLS6WLbikqlCrvqE26buVRh7dw/exec';
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxTszwWv2QZIA5biaU39UMYlO4we8klvuWITJak-CZIPxgOfNuIKdio14xacSXcRZA6ng/exec';
 
 /**
  * Appends a new row of data to the Google Sheet via Google Apps Script.
@@ -55,7 +55,17 @@ export async function appendToSheet(rowData: any[]): Promise<any> {
     if (contentType && contentType.indexOf('application/json') !== -1) {
       const result = await response.json();
       console.warn('✅ Google Apps Script response:', result);
-      return result;
+      // UNWRAP THE RESPONSE to provide a clean object to the UI
+      if (result && result.data && result.data.success) {
+          return {
+              success: true,
+              owedData: result.data.owedData
+          };
+      } else {
+          // The script itself indicated failure or returned a malformed response
+          const errorMessage = result.message || 'The script returned an error.';
+          throw new Error(errorMessage);
+      }
     } else {
       const text = await response.text();
       console.error('❌ Non-JSON response from Apps Script:', text);
@@ -122,4 +132,51 @@ export async function testConnection(): Promise<boolean> {
     console.error('❌ Connection test failed:', error);
     return false;
   }
+}
+
+/**
+ * Fetches the initial "Owed" data from the "Safe" sheet in Google Sheets.
+ * Uses a GET request to a specific endpoint that only reads data.
+ */
+export async function getInitialOwedData(): Promise<{ success: boolean; owedData?: any; message?: string }> {
+    const getUrl = `${APPS_SCRIPT_URL}?action=getOwedData`;
+    console.log(`Fetching initial owed data from: ${getUrl}`);
+
+    try {
+        const response = await fetch(getUrl, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+        });
+        
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error('Failed to fetch initial data. Server responded with:', response.status, errorText);
+            throw new Error(`Server error: ${response.status}`);
+        }
+
+        const result = await response.json();
+        console.log("Full initial data response from script:", result);
+
+        // UNWRAP THE RESPONSE to provide a clean object to the UI
+        if (result && result.data && result.data.success) {
+            return {
+                success: true,
+                owedData: result.data.owedData
+            };
+        } else {
+            // The script itself indicated failure or returned a malformed response
+            const errorMessage = result.message || 'Unknown error from Apps Script.';
+            throw new Error(errorMessage);
+        }
+
+    } catch (error) {
+        console.error("Error processing initial data fetch:", error);
+        if (error instanceof SyntaxError) {
+            console.error("The server response for initial data was not valid JSON.");
+        }
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        return { success: false, message: errorMessage };
+    }
 } 

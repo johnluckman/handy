@@ -19,10 +19,35 @@ const LOG_SHEET_NAME = 'Log';
 const SUMMARY_SHEET_NAME = 'Safe';
 
 /**
- * Handles browser visits to the URL gracefully.
+ * Handles GET requests.
+ * Can be used to fetch initial data.
  */
 function doGet(e) {
   Logger.log('doGet triggered. Request parameters: ' + JSON.stringify(e.parameter));
+  
+  if (e.parameter.action === 'getOwedData') {
+    try {
+      const owedData = getOwedData();
+      Logger.log('Successfully read owed data for initial load: ' + JSON.stringify(owedData));
+      return createResponse(200, 'Owed data fetched successfully', {
+          success: true,
+          owedData: owedData
+      });
+    } catch(error) {
+        // ... (error handling from doPost)
+        Logger.log('!!! SCRIPT CRASHED during getOwedData !!!');
+        Logger.log('Error Message: ' + error.message);
+        Logger.log('Error Stack: ' + error.stack);
+        return createResponse(500, 'Internal server error', {
+            success: false,
+            error: {
+                message: error.message,
+                stack: error.stack
+            }
+        });
+    }
+  }
+
   return ContentService
     .createTextOutput('Google Apps Script for Handy Cash Counter is running. Use POST requests to submit data.')
     .setMimeType(ContentService.MimeType.TEXT);
