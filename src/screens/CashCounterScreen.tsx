@@ -275,19 +275,21 @@ export default function CashCounterScreen(): React.ReactElement {
 
             <View style={styles.summaryContainer}>
               <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>Count Total:</Text>
-                <Text style={styles.summaryValue}>{`$${total.toFixed(2)}`}</Text>
+                <Text style={styles.totalLabel}>Count Total:</Text>
+                <Text style={styles.totalValue}>{`$${total.toFixed(2)}`}</Text>
               </View>
               <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>Float total:</Text>
+                <Text style={styles.summaryLabel}>
+                  Float total: {totalTargetFloat === idealFloat ? '✅' : '❌'}
+                </Text>
                 <Text style={styles.summaryValue}>{`$${totalTargetFloat.toFixed(2)} / $${idealFloat.toFixed(2)}`}</Text>
               </View>
               <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>Borrow total:</Text>
+                <Text style={styles.summaryLabel}>Borrowed Total:</Text>
                 <Text style={styles.summaryValue}>{`$${totalBorrowed.toFixed(2)}`}</Text>
               </View>
               <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>Total returned:</Text>
+                <Text style={styles.summaryLabel}>Returned Total:</Text>
                 <Text style={styles.summaryValue}>{`$${totalReturned.toFixed(2)}`}</Text>
               </View>
             </View>
@@ -400,14 +402,24 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 4,
   },
+  totalLabel: {
+    fontSize: 20,
+    fontFamily: 'Inter-SemiBold',
+    color: '#333',
+  },
+  totalValue: {
+    fontSize: 20,
+    fontFamily: 'Inter-Bold',
+    color: '#333',
+  },
   summaryLabel: {
     fontSize: 16,
-    fontFamily: 'Inter-SemiBold',
+    fontFamily: 'Inter-Regular',
     color: '#333',
   },
   summaryValue: {
     fontSize: 16,
-    fontFamily: 'Inter-Bold',
+    fontFamily: 'Inter-SemiBold',
     color: '#333',
   },
   buttonContainer: {
