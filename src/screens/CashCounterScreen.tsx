@@ -1,75 +1,90 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, Button, Alert } from 'react-native';
-import DenominationInput from '../components/DenominationInput';
+import { View, Text, StyleSheet, ScrollView, Button, Alert, TextInput } from 'react-native';
+import DenominationRow, { RowData } from '../components/DenominationRow';
 import { denominations, Denomination } from '../utils/denominations';
 import { appendToSheet, testConnection } from '../services/googleSheets';
 
-interface Counts {
-  [key: string]: number;
+// Defines the structure for our state, mapping each denomination ID to its RowData
+interface DenominationData {
+  [id: string]: RowData;
 }
+
+// Function to initialize the state from our denominations config
+const initializeState = (): DenominationData => {
+  const initialState: DenominationData = {};
+  denominations.forEach(d => {
+    initialState[d.id] = {
+      actualCount: 0,
+      targetFloat: d.targetCount,
+      borrow: d.targetCount, // Initially, borrow is target since actual is 0
+      returned: 0,
+    };
+  });
+  return initialState;
+};
 
 /**
  * @returns {React.ReactElement} The Cash Counter screen component.
  */
 export default function CashCounterScreen(): React.ReactElement {
-  const [counts, setCounts] = React.useState<Counts>({});
+  const [data, setData] = React.useState<DenominationData>(initializeState);
   const [isLoading, setIsLoading] = React.useState(false);
   const [isTesting, setIsTesting] = React.useState(false);
+  const [userName, setUserName] = React.useState('DefaultUser');
+  const [notes, setNotes] = React.useState('');
 
-  const handleCountChange = (denomination: string, count: number) => {
-    setCounts((prevCounts) => ({
-      ...prevCounts,
-      [denomination]: count,
+  const handleRowDataChange = (id: string, newRowData: RowData) => {
+    setData(prevData => ({
+      ...prevData,
+      [id]: newRowData,
     }));
   };
 
   const calculateTotal = () => {
     return denominations.reduce((total, item) => {
-      const count = counts[item.id] || 0;
-      return total + count * item.value;
+      const row = data[item.id];
+      return total + (row.actualCount * item.value);
     }, 0);
   };
-
+  
   const total = calculateTotal();
 
   const handleSubmit = async () => {
-    console.warn('🎯 Submit button pressed');
     setIsLoading(true);
-    const date = new Date().toLocaleDateString();
-    const user = 'DefaultUser'; // This would be replaced with actual user session data
+    const date = new Date().toISOString();
 
+    // Flatten the data for the sheet row
     const rowData = [
       date,
-      user,
+      userName,
+      notes,
       total,
-      ...denominations.map(d => counts[d.id] || 0)
+      // Add all data points for each denomination
+      ...denominations.flatMap(d => {
+        const row = data[d.id];
+        return [row.actualCount, row.targetFloat, row.borrow, row.returned, 0]; // 0 is a placeholder for "Still Owed"
+      })
     ];
-
-    console.warn('📝 Prepared row data:', rowData);
 
     try {
       const result = await appendToSheet(rowData);
-      console.warn('🎉 Submit result:', result);
-      // Check for a successful response from the Apps Script
       if (result && result.data && result.data.success) {
-        Alert.alert(
-          'Success', 
-          'Cash count successfully submitted to Google Sheets!',
-          [
-            { text: 'OK', onPress: () => setCounts({}) }
-          ]
+        Alert.alert('Success', 'Cash count successfully submitted to Google Sheets!',
+          [{ text: 'OK', onPress: () => setData(initializeState) }]
         );
       } else {
-        // Handle cases where the script runs but returns a failure
         throw new Error(result.message || 'Submission failed. Please check the logs.');
       }
     } catch (error: any) {
-      console.error('💥 Submit error:', error);
-      Alert.alert('Error', error.message || 'There was an error submitting the count. Please try again.');
+      Alert.alert('Error', error.message || 'There was an error submitting the count.');
     } finally {
       setIsLoading(false);
     }
   };
+  
+  // Also, add headers for the new columns in your Google Sheet:
+  // Date, User, Notes, Total, 100_Actual, 100_Target, 100_Borrow, 100_Returned, 100_Owed, 50_Actual, ...etc.
+
 
   const handleTestConnection = async () => {
     console.warn('🧪 Test connection button pressed');
@@ -93,39 +108,43 @@ export default function CashCounterScreen(): React.ReactElement {
     <ScrollView style={styles.container}>
       <Text style={styles.title}>Cash Count</Text>
       
-      {/* Implementation Status */}
-      <View style={styles.statusContainer}>
-        <Text style={styles.statusText}>
-          🔗 Live Connection to Google Sheets
-        </Text>
-        <Text style={styles.statusSubtext}>
-          Submissions will be added directly to your spreadsheet.
-        </Text>
+      <View style={styles.userInputsContainer}>
+        <TextInput
+          style={styles.textInput}
+          placeholder="Your Name"
+          value={userName}
+          onChangeText={setUserName}
+        />
+        <TextInput
+          style={styles.textInput}
+          placeholder="Add notes (e.g., End of Day Till 1)"
+          value={notes}
+          onChangeText={setNotes}
+        />
       </View>
-
+      
       <View style={styles.list}>
         {denominations.map((item: Denomination) => (
-          <DenominationInput
+          <DenominationRow
             key={item.id}
-            denomination={item.id}
-            value={item.value}
-            imageUrl={item.imageUrl}
-            onCountChange={handleCountChange}
+            denomination={item}
+            rowData={data[item.id]}
+            onRowDataChange={handleRowDataChange}
           />
         ))}
       </View>
+      
       <View style={styles.summaryContainer}>
-        <Text style={styles.totalText}>Total:</Text>
+        <Text style={styles.totalText}>Count Total:</Text>
         <Text style={styles.totalAmount}>{`$${total.toFixed(2)}`}</Text>
       </View>
       
-      {/* Test Connection Button */}
       <View style={styles.buttonContainer}>
         <Button 
           title={isTesting ? 'Testing...' : 'Test Connection'} 
           onPress={handleTestConnection} 
           disabled={isTesting || isLoading}
-          color="#666"
+          color="#888"
         />
       </View>
       
@@ -152,23 +171,17 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 20,
   },
-  statusContainer: {
-    backgroundColor: '#e8f5e9',
-    padding: 15,
-    borderRadius: 10,
-    marginBottom: 20,
-    borderLeftWidth: 4,
-    borderLeftColor: '#4caf50',
+  userInputsContainer: {
+    marginBottom: 15,
   },
-  statusText: {
+  textInput: {
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    padding: 12,
     fontSize: 16,
-    fontWeight: '600',
-    color: '#2e7d32',
-    marginBottom: 5,
-  },
-  statusSubtext: {
-    fontSize: 14,
-    color: '#424242',
+    marginBottom: 10,
   },
   list: {
     marginBottom: 20,

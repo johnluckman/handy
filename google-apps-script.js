@@ -14,8 +14,8 @@
  */
 
 // Configuration - UPDATE THIS WITH YOUR ACTUAL SHEET ID
-const SPREADSHEET_ID = 'YOUR_GOOGLE_SHEET_ID_HERE';
-const SHEET_NAME = 'Sheet1'; // Change if your sheet has a different name
+const SPREADSHEET_ID = '1RDRzIO8XLQXAsY_GdvgOLlUyk0Fnz5Bqc4IrEASiYok';
+const SHEET_NAME = 'Log'; // Change if your sheet has a different name
 
 /**
  * Handles browser visits to the URL gracefully.
