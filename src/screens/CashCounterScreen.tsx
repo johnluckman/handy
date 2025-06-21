@@ -4,12 +4,13 @@ import NetInfo, { useNetInfo } from '@react-native-community/netinfo';
 import { LinearGradient } from 'expo-linear-gradient';
 import DenominationRow, { RowData } from '../components/DenominationRow';
 import { denominations, Denomination } from '../utils/denominations';
-import { appendToSheet, testConnection, getInitialOwedData } from '../services/googleSheets';
+import { appendToSheet, fetchOwedData } from '../services/googleSheets';
 import { addToQueue } from '../services/queueService';
 import { useQueue } from '../context/QueueContext'; // Corrected import path
 import { useNavigation } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { NavigationProps } from '../navigation/AppNavigator';
+import { useAuth } from '../context/AuthContext'; // Import useAuth
 
 // Defines the structure for our state, mapping each denomination ID to its RowData
 interface DenominationData {
@@ -35,14 +36,36 @@ const initializeState = (): DenominationData => {
  * @returns {React.ReactElement} The Cash Counter screen component.
  */
 export default function CashCounterScreen(): React.ReactElement {
+  const { user: userName, store } = useAuth();
   const navigation = useNavigation<NavigationProps>();
-  const [data, setData] = React.useState<DenominationData>(initializeState);
-  const [isLoading, setIsLoading] = React.useState(true);
-  const [isTesting, setIsTesting] = React.useState(false);
-  const [userName, setUserName] = React.useState('');
-  const [notes, setNotes] = React.useState('');
   const netInfo = useNetInfo();
+  const [data, setData] = useState<DenominationData>(initializeState());
+  const [notes, setNotes] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
   const queueContext = useQueue();
+
+  const loadInitialData = useCallback(async () => {
+    setIsLoading(true);
+    // Create a fresh state object, which also clears any user input
+    const newState = initializeState();
+    setNotes('');
+
+    const owedData = await fetchOwedData();
+    if (owedData) {
+      // Populate the new state object with the fetched data
+      for (const id in owedData) {
+        if (newState[id]) {
+          newState[id].owed = owedData[id];
+        }
+      }
+    }
+    setData(newState);
+    setIsLoading(false);
+  }, []);
+
+  useEffect(() => {
+    loadInitialData();
+  }, [loadInitialData]);
 
   const handleRowDataChange = (id: string, newRowData: RowData) => {
     setData(prevData => ({
@@ -89,45 +112,10 @@ export default function CashCounterScreen(): React.ReactElement {
     };
   }, [data]);
 
-  const handleTestConnection = async () => {
-    console.warn('🧪 Test connection button pressed');
-    setIsTesting(true);
-    try {
-      const success = await testConnection();
-      console.warn('🧪 Test connection result:', success);
-      Alert.alert(
-        'Connection Test', 
-        success ? '✅ Connection test successful!' : '❌ Connection test failed. Check console for details.'
-      );
-    } catch (error) {
-      console.error('💥 Test connection error:', error);
-      Alert.alert('Error', 'Connection test failed. Check console for details.');
-    } finally {
-      setIsTesting(false);
-    }
-  };
-
   const handleClearForm = () => {
-    setData(prevData => {
-      const clearedData = { ...prevData };
-      // Loop through each denomination in the state
-      for (const id in clearedData) {
-        // Keep the existing server-driven data ('owed' and 'targetFloat')
-        // and only reset the user-input fields.
-        clearedData[id] = {
-          ...clearedData[id],
-          actualCount: 0,
-          returned: 0,
-          // Automatically recalculate the borrow amount based on the cleared count
-          borrow: Math.max(0, clearedData[id].targetFloat - 0),
-        };
-      }
-      return clearedData;
-    });
-    // Also clear the general text inputs
-    setUserName('');
+    setData(initializeState());
     setNotes('');
-  }
+  };
 
   const handleSubmit = async () => {
     setIsLoading(true);
@@ -138,73 +126,54 @@ export default function CashCounterScreen(): React.ReactElement {
       return [row.actualCount, row.targetFloat, row.borrow, row.returned];
     });
 
-    const rowData = [ date, userName, notes, total, ...flatData ];
+    // The Apps Script expects specific keys ('count', 'float') for the denomination data.
+    // We need to transform the 'data' state object to match this structure.
+    const transformedDenominations = Object.keys(data).reduce((acc, key) => {
+      const original = data[key];
+      acc[key] = {
+        count: original.actualCount,
+        float: original.targetFloat,
+        borrow: original.borrow,
+        returned: original.returned,
+      };
+      return acc;
+    }, {} as { [id: string]: { count: number; float: number; borrow: number; returned: number } });
+
+    const submissionData = {
+      timestamp: new Date().toISOString(),
+      user: userName,
+      store: store,
+      notes: notes,
+      total: total,
+      denominations: transformedDenominations,
+    };
 
     try {
       // 1. Add to storage
-      await addToQueue(rowData);
+      await addToQueue(submissionData);
       
       // 2. Trigger the sync and get the result
-      const syncResult = await queueContext.syncQueue();
+      const result = await queueContext.processQueue();
       
-      // 3. Update the UI with the new "Owed" data if the sync was successful
-      if (syncResult.success && syncResult.owedData) {
-        setData(prevData => {
-            const updatedData = { ...prevData };
-            for (const id in syncResult.owedData) {
-                if (updatedData[id]) {
-                    updatedData[id] = { ...updatedData[id], owed: syncResult.owedData[id] };
-                }
-            }
-            return updatedData;
-        });
-        Alert.alert('Success', 'You cash count has been submitted!');
+      // 3. Handle the result
+      if (result.success) {
+        Alert.alert('Success', `Successfully submitted ${result.batchSize > 1 ? `${result.batchSize} records` : '1 record'}.`);
+        await loadInitialData(); // Reload data instead of just clearing the form
       } else {
-        Alert.alert('Count Saved', 'Your count has been saved and will sync next time you are online.');
+        // The item is already in the queue, so we just notify the user.
+        Alert.alert('Offline', `Your data is saved offline and will be submitted later. ${result.message}`);
       }
-
-      // 4. Clear the user-input parts of the form
-      handleClearForm();
-
-    } catch (error: any) {
-      Alert.alert('Error', 'There was an error saving your submission. Please try again.');
+    } catch (error) {
+      Alert.alert('Error', 'An unexpected error occurred while trying to submit your data.');
+      console.error('Submission failed:', error);
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Fetch initial owed data when the component mounts
-  useEffect(() => {
-    const fetchInitialData = async () => {
-      console.log("Attempting to fetch initial owed data...");
-      setIsLoading(true);
-      const result = await getInitialOwedData();
-      if (result.success && result.owedData) {
-        console.log("Successfully fetched initial owed data:", result.owedData);
-        // MERGE the fetched owedData into the main data state
-        setData(prevData => {
-            const updatedData = { ...prevData };
-            for (const id in result.owedData) {
-                if (updatedData[id]) {
-                    updatedData[id] = { ...updatedData[id], owed: result.owedData[id] };
-                }
-            }
-            console.log("Updated data state with initial owed values:", updatedData);
-            return updatedData;
-        });
-      } else {
-        console.error("Failed to fetch or parse initial data:", result.message);
-        Alert.alert("Error", "Could not load initial data from the sheet. Please check your connection and try again.");
-      }
-      setIsLoading(false);
-    };
-
-    fetchInitialData();
-  }, []);
-
   const queueSize = queueContext.queue.length;
 
-  if (isLoading && !isTesting) {
+  if (isLoading) {
     return (
       <View style={styles.centered}>
         <ActivityIndicator size="large" color="#007AFF" />
@@ -250,13 +219,7 @@ export default function CashCounterScreen(): React.ReactElement {
             <View style={styles.userInputsContainer}>
               <TextInput
                 style={styles.textInput}
-                placeholder="Your Name"
-                value={userName}
-                onChangeText={setUserName}
-              />
-              <TextInput
-                style={styles.textInput}
-                placeholder="Add comments"
+                placeholder="Add notes (e.g., End of Day Till 1)"
                 value={notes}
                 onChangeText={setNotes}
               />
@@ -296,9 +259,9 @@ export default function CashCounterScreen(): React.ReactElement {
 
             <View style={styles.buttonContainer}>
               <TouchableOpacity
-                style={[styles.submitButton, (isLoading || isTesting) && styles.submitButtonDisabled]}
+                style={[styles.submitButton, isLoading && styles.submitButtonDisabled]}
                 onPress={handleSubmit}
-                disabled={isLoading || isTesting}
+                disabled={isLoading}
               >
                 <Text style={styles.submitButtonText}>
                   {isLoading ? 'Submitting...' : 'Submit Count'}

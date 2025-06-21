@@ -23,33 +23,25 @@ const SUMMARY_SHEET_NAME = 'Safe';
  * Can be used to fetch initial data.
  */
 function doGet(e) {
-  Logger.log('doGet triggered. Request parameters: ' + JSON.stringify(e.parameter));
+  Logger.log('doGet triggered with parameters: ' + JSON.stringify(e.parameter));
   
-  if (e.parameter.action === 'getOwedData') {
+  if (e && e.parameter && e.parameter.action === 'getOwedData') {
     try {
       const owedData = getOwedData();
-      Logger.log('Successfully read owed data for initial load: ' + JSON.stringify(owedData));
-      return createResponse(200, 'Owed data fetched successfully', {
-          success: true,
-          owedData: owedData
-      });
-    } catch(error) {
-        // ... (error handling from doPost)
-        Logger.log('!!! SCRIPT CRASHED during getOwedData !!!');
-        Logger.log('Error Message: ' + error.message);
-        Logger.log('Error Stack: ' + error.stack);
-        return createResponse(500, 'Internal server error', {
-            success: false,
-            error: {
-                message: error.message,
-                stack: error.stack
-            }
-        });
+      Logger.log('Successfully fetched owed data: ' + JSON.stringify(owedData));
+      // Using the standard success response structure.
+      return createResponse(200, 'Owed data fetched successfully.', { owedData: owedData });
+    } catch (error) {
+      Logger.log('!!! SCRIPT CRASHED during getOwedData in doGet !!!');
+      Logger.log('Error Message: ' + error.message);
+      Logger.log('Error Stack: ' + error.stack);
+      return createResponse(500, 'Internal Server Error', { error: error.message });
     }
   }
 
+  // Default GET response
   return ContentService
-    .createTextOutput('Google Apps Script for Handy Cash Counter is running. Use POST requests to submit data.')
+    .createTextOutput('Google Apps Script for Handy Cash Counter is running. Use POST to submit data or GET with action=getOwedData to fetch summary.')
     .setMimeType(ContentService.MimeType.TEXT);
 }
 
@@ -59,40 +51,74 @@ function doGet(e) {
  */
 function doPost(e) {
   Logger.log('--- New POST Request Received ---');
+  let spreadsheet;
   try {
-    Logger.log('Request object (e): ' + JSON.stringify(e));
-
+    // It's good practice to parse the payload early.
     if (!e || !e.postData || !e.postData.contents) {
       Logger.log('Error: Request is missing postData or contents.');
       return createResponse(400, 'Bad Request: No POST data received.');
     }
     
     Logger.log('Received raw postData.contents: ' + e.postData.contents);
-    const data = JSON.parse(e.postData.contents);
-    Logger.log('Successfully parsed JSON data: ' + JSON.stringify(data));
+    const payload = JSON.parse(e.postData.contents);
+    Logger.log('Successfully parsed JSON payload: ' + JSON.stringify(payload));
     
-    if (!data.sheetId || !data.data || !Array.isArray(data.data)) {
-        Logger.log('Error: Invalid data format. Missing sheetId or data array.');
-        return createResponse(400, 'Invalid data format');
+    // The app now sends a "batch" of records inside a `data` property.
+    if (!payload.data || !Array.isArray(payload.data)) {
+        Logger.log('Error: Invalid payload format. Expected a "data" property with an array of records.');
+        return createResponse(400, 'Invalid data format: "data" array not found.');
     }
-    Logger.log('Data format is valid.');
+    Logger.log(`Payload contains ${payload.data.length} record(s) to process.`);
     
-    // 1. Append the new row to the Log sheet
-    const appendResult = appendToLogSheet(data.data);
-    Logger.log('Data successfully appended to Log sheet. Result: ' + JSON.stringify(appendResult));
-    
-    // 2. Read the summary "Owed" data from the Safe sheet
-    const owedData = getOwedData();
-    Logger.log('Successfully read owed data from Safe sheet: ' + JSON.stringify(owedData));
+    spreadsheet = SpreadsheetApp.openById(SPREADSHEET_ID);
+    const sheet = spreadsheet.getSheetByName(LOG_SHEET_NAME);
+    if (!sheet) {
+      throw new Error(`Sheet "${LOG_SHEET_NAME}" not found.`);
+    }
 
-    // 3. Return a combined success response
-    Logger.log('Creating success response...');
-    return createResponse(200, 'Data appended successfully', {
-      success: true,
-      message: 'Data appended and summary returned.',
-      rowsAdded: appendResult.rowsAdded,
-      owedData: owedData // Pass the owed data back to the app
+    // Get header row to map object keys to column indices
+    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    Logger.log('Sheet Headers: ' + headers.join(', '));
+    
+    const records = payload.data;
+    
+    records.forEach((record, index) => {
+      Logger.log(`Processing record ${index + 1}...`);
+      
+      const newRow = headers.map(header => {
+        switch(header) {
+          case 'Date':
+            return record.date || new Date().toISOString();
+          case 'User':
+            return record.user || null;
+          case 'Store':
+            return record.store || null;
+          case 'Notes':
+            return record.notes || null;
+          case 'Total':
+            return record.total || null;
+          default:
+            // Handle dynamic denomination columns like "100_Count", "50_Float", etc.
+            const parts = header.split('_');
+            if (parts.length === 2) {
+              const denominationValue = parts[0]; // e.g., "100", "50", "0.05"
+              const fieldType = parts[1].toLowerCase(); // e.g., "count", "float", "borrow", "returned"
+              
+              if (record.denominations && record.denominations[denominationValue]) {
+                return record.denominations[denominationValue][fieldType] || 0;
+              }
+            }
+            return null; // Return null for any unmapped columns
+        }
+      });
+      
+      Logger.log(`Appending new row for record ${index + 1}: ${JSON.stringify(newRow)}`);
+      sheet.appendRow(newRow);
     });
+
+    Logger.log(`Successfully appended ${records.length} records.`);
+    
+    return createResponse(200, `${records.length} records added successfully.`);
     
   } catch (error) {
     Logger.log('!!! SCRIPT CRASHED !!!');
@@ -115,32 +141,17 @@ function doPost(e) {
  * Appends a row of data to the Log Sheet
  */
 function appendToLogSheet(rowData) {
-  Logger.log('appendToLogSheet called with rowData: ' + JSON.stringify(rowData));
-  const spreadsheet = SpreadsheetApp.openById(SPREADSHEET_ID);
-  Logger.log('Spreadsheet opened successfully.');
-  const sheet = spreadsheet.getSheetByName(LOG_SHEET_NAME);
-  
-  if (!sheet) {
-    Logger.log('Error: Sheet "' + LOG_SHEET_NAME + '" not found.');
-    throw new Error('Sheet "' + LOG_SHEET_NAME + '" not found');
-  }
-  Logger.log('Sheet "' + LOG_SHEET_NAME + '" found.');
-  
-  const lastRow = sheet.getLastRow();
-  Logger.log('Last row is: ' + lastRow);
-  const range = sheet.getRange(lastRow + 1, 1, 1, rowData.length);
-  Logger.log('Target range for new data is: ' + range.getA1Notation());
-  range.setValues([rowData]);
-  Logger.log('Successfully set values in range.');
-  
-  return {
-    rowsAdded: 1,
-    rowNumber: lastRow + 1
-  };
+  // This function is no longer suitable for the new data structure.
+  // The logic is now handled directly in doPost to map the object to the columns.
+  Logger.log('DEPRECATED function appendToLogSheet was called. This should not happen.');
+  // The new logic uses appendRow which is simpler.
+  // If this needs to be used, it requires significant rework.
 }
 
 /**
  * Reads the "Owed" data from the "Safe" summary sheet.
+ * This version dynamically reads the header row to map values,
+ * making it resilient to column reordering in the sheet.
  */
 function getOwedData() {
   const spreadsheet = SpreadsheetApp.openById(SPREADSHEET_ID);
@@ -150,39 +161,39 @@ function getOwedData() {
     throw new Error('Summary sheet "' + SUMMARY_SHEET_NAME + '" not found');
   }
 
-  // Reads the values from B2 to L2.
-  // The range is 1 row, 11 columns, starting at row 2, column 2.
-  const owedValues = summarySheet.getRange(2, 2, 1, 11).getValues()[0];
+  // Read the header row (Row 1) to get the denomination keys.
+  // We assume headers start from column B (column 2) and go to the last column.
+  const lastColumn = summarySheet.getLastColumn();
+  const headers = summarySheet.getRange(1, 2, 1, lastColumn - 1).getValues()[0];
+  
+  // Reads the corresponding values from the data row (Row 2).
+  const owedValues = summarySheet.getRange(2, 2, 1, lastColumn - 1).getValues()[0];
 
-  // Map the array of values to a structured object for easier use in the app
-  const denominationIds = ['100', '50', '20', '10', '5', '2', '1', '0.50', '0.20', '0.10', '0.05'];
+  // Map the array of values to a structured object using the headers as keys.
   const owedDataObject = {};
-  denominationIds.forEach((id, index) => {
-    owedDataObject[id] = owedValues[index] || 0; // Default to 0 if cell is empty
+  headers.forEach((header, index) => {
+    // The header might be "100_Owing". We only want the "100" part.
+    // We split by underscore and take the first part as the ID.
+    const denominationId = String(header).split('_')[0];
+    owedDataObject[denominationId] = owedValues[index] || 0; // Default to 0 if cell is empty
   });
-
+  
+  Logger.log('Dynamically fetched owed data based on headers: ' + JSON.stringify(owedDataObject));
   return owedDataObject;
 }
 
 /**
  * Creates a proper HTTP response
  */
-function createResponse(statusCode, message, data = null) {
-  const response = {
-    status: statusCode,
+function createResponse(statusCode, message, data = {}) {
+  const responsePayload = {
+    success: statusCode >= 200 && statusCode < 300,
     message: message,
-    timestamp: new Date().toISOString()
+    ...data
   };
-  
-  if (data) {
-    response.data = data;
-  }
-  
-  // The .setStatusCode() function can be buggy in some Apps Script runtimes.
-  // We can remove it, as the default is 200 OK anyway.
-  // For error responses, the client will see the 500 status from the fetch `response.ok` check.
+
   return ContentService
-    .createTextOutput(JSON.stringify(response))
+    .createTextOutput(JSON.stringify(responsePayload))
     .setMimeType(ContentService.MimeType.JSON);
 }
 

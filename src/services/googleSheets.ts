@@ -1,7 +1,20 @@
-import { GOOGLE_SHEET_ID } from '@env';
+import { GOOGLE_SHEET_ID, APPS_SCRIPT_URL } from '@env';
 
-// Configuration - UPDATE THIS WITH YOUR GOOGLE APPS SCRIPT WEB APP URL
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxTszwWv2QZIA5biaU39UMYlO4we8klvuWITJak-CZIPxgOfNuIKdio14xacSXcRZA6ng/exec';
+/**
+ * IMPORTANT: BACKEND CHANGE REQUIRED
+ * The Google Apps Script `doPost` function must be updated to handle this new data structure.
+ * It should expect a JSON payload with a `batch` property, which is an array of submission objects.
+ * It needs to iterate over the `batch` array and write a new row for each object.
+ */
+
+interface SubmissionData {
+  timestamp: string;
+  user: string | null;
+  store: string | null;
+  notes: string;
+  total: number;
+  denominations: object;
+}
 
 /**
  * Appends a new row of data to the Google Sheet via Google Apps Script.
@@ -12,99 +25,51 @@ const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxTszwWv2QZIA5b
  * @param {any[]} rowData - The data to append.
  * @returns {Promise<any>} The response from the Google Apps Script.
  */
-export async function appendToSheet(rowData: any[]): Promise<any> {
-  console.warn('🚀 appendToSheet called with data:', rowData);
-  
+export async function appendToSheet(batch: object[]): Promise<{ success: boolean; message?: string }> {
+  if (!APPS_SCRIPT_URL) {
+    console.warn('Google Apps Script URL is not defined. Using mock implementation.');
+    return mockAppendToSheet(batch);
+  }
+
   try {
-    // Check if we have the required configuration
-    if (!APPS_SCRIPT_URL) {
-      console.warn('⚠️ Google Apps Script URL not configured. Using mock implementation.');
-      return await mockAppendToSheet(rowData);
-    }
-
-    if (!GOOGLE_SHEET_ID) {
-      console.warn('⚠️ Google Sheet ID not configured.');
-      throw new Error('Google Sheet ID not configured');
-    }
-
-    console.warn('📡 Sending data to Google Apps Script...');
-    console.warn('🔗 URL:', APPS_SCRIPT_URL);
-    
-    // Prepare the request payload
-    const payload = {
-      sheetId: GOOGLE_SHEET_ID,
-      data: rowData,
-      timestamp: new Date().toISOString()
-    };
-
-    console.warn('📦 Payload:', JSON.stringify(payload, null, 2));
-
-    // Send the request to Google Apps Script
     const response = await fetch(APPS_SCRIPT_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(payload),
+      body: JSON.stringify({
+        sheetId: GOOGLE_SHEET_ID,
+        data: batch, // The script now expects a 'data' property
+      }),
     });
 
-    console.warn('📡 Response status:', response.status);
-    console.warn('📡 Response ok:', response.ok);
-
-    const contentType = response.headers.get('content-type');
-    if (contentType && contentType.indexOf('application/json') !== -1) {
-      const result = await response.json();
-      console.warn('✅ Google Apps Script response:', result);
-      // UNWRAP THE RESPONSE to provide a clean object to the UI
-      if (result && result.data && result.data.success) {
-          return {
-              success: true,
-              owedData: result.data.owedData
-          };
-      } else {
-          // The script itself indicated failure or returned a malformed response
-          const errorMessage = result.message || 'The script returned an error.';
-          throw new Error(errorMessage);
-      }
-    } else {
-      const text = await response.text();
-      console.error('❌ Non-JSON response from Apps Script:', text);
-      throw new Error('Non-JSON response from Apps Script');
-    }
-
-  } catch (err: any) {
-    console.error('❌ Error appending data:', err);
-    console.error('❌ Error details:', {
-      message: err?.message || 'Unknown error',
-      stack: err?.stack,
-      url: APPS_SCRIPT_URL,
-      hasSheetId: !!GOOGLE_SHEET_ID
-    });
+    const result = await response.json();
+    console.log('--- FULL SERVER RESPONSE ---');
+    console.log(JSON.stringify(result, null, 2));
+    console.log('--------------------------');
     
-    // Fallback to mock implementation if there's an error
-    console.warn('🔄 Falling back to mock implementation...');
-    return await mockAppendToSheet(rowData);
+    if (response.ok) {
+      console.log('Successfully sent batch to Google Sheets:', result.message);
+      return { success: true, message: result.message };
+    } else {
+      const errorMessage = (result && result.message) ? result.message : 'An unknown error occurred.';
+      console.error('Failed to send batch to Google Sheets:', errorMessage);
+      return { success: false, message: errorMessage };
+    }
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error('Error sending data to Google Sheets:', errorMessage);
+    return { success: false, message: errorMessage };
   }
 }
 
 /**
  * Mock implementation for testing and fallback
  */
-async function mockAppendToSheet(rowData: any[]): Promise<any> {
-  console.warn('🎭 Using mock implementation');
+async function mockAppendToSheet(batch: object[]): Promise<any> {
+  console.warn('🎭 Using mock implementation for batch submission');
   
-  // Log the data for debugging
-  const logData = {
-    timestamp: new Date().toISOString(),
-    sheetId: GOOGLE_SHEET_ID || 'NOT_SET',
-    data: rowData,
-    environment: {
-      hasSheetId: !!GOOGLE_SHEET_ID,
-      hasAppsScriptUrl: !!APPS_SCRIPT_URL
-    }
-  };
-  
-  console.warn('📊 Cash Counter Data (Mock):', JSON.stringify(logData, null, 2));
+  console.warn('📊 Cash Counter Batch Data (Mock):', JSON.stringify(batch, null, 2));
 
   // Simulate network delay
   await new Promise(resolve => setTimeout(resolve, 1000));
@@ -112,71 +77,56 @@ async function mockAppendToSheet(rowData: any[]): Promise<any> {
   // Return success response
   return {
     success: true,
-    message: 'Data logged successfully (mock implementation)',
+    message: 'Batch logged successfully (mock implementation)',
     timestamp: new Date().toISOString(),
-    data: rowData
+    data: batch
   };
 }
 
 /**
- * Test function to verify the connection
+ * Fetches the current "Owed" data from the summary sheet in Google Sheets.
+ * This is used to populate the initial float values in the cash counter.
  */
-export async function testConnection(): Promise<boolean> {
-  console.warn('🧪 Testing connection...');
+export async function fetchOwedData(): Promise<{ [key: string]: number } | null> {
+  if (!APPS_SCRIPT_URL) {
+    console.warn('Google Apps Script URL is not defined. Cannot fetch owed data.');
+    return null;
+  }
+
+  const url = `${APPS_SCRIPT_URL}?action=getOwedData`;
+
   try {
-    const result = await appendToSheet(['TEST', 'Connection Test', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
-    console.warn('✅ Connection test result:', result);
-    // The 'success' property is nested inside the 'data' object from the Apps Script response.
-    return result && result.data && result.data.success;
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    const resultText = await response.text();
+    console.log('--- RAW SERVER RESPONSE (for getOwedData) ---');
+    console.log(resultText);
+    console.log('---------------------------------------------');
+
+    const result = JSON.parse(resultText);
+
+    // The script might return the payload inside a `data` property (old version)
+    // or at the top level (new version). This handles both.
+    const payload = result.data || result;
+
+    if (response.ok && payload.success && payload.owedData) {
+      console.log('Successfully fetched owed data.');
+      return payload.owedData;
+    } else {
+      const errorMessage = payload.message || result.message || 'Unknown error fetching owed data';
+      console.error('Failed to fetch owed data:', errorMessage);
+      return null;
+    }
   } catch (error) {
-    console.error('❌ Connection test failed:', error);
-    return false;
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error('Error fetching owed data:', errorMessage);
+    return null;
   }
 }
 
-/**
- * Fetches the initial "Owed" data from the "Safe" sheet in Google Sheets.
- * Uses a GET request to a specific endpoint that only reads data.
- */
-export async function getInitialOwedData(): Promise<{ success: boolean; owedData?: any; message?: string }> {
-    const getUrl = `${APPS_SCRIPT_URL}?action=getOwedData`;
-    console.log(`Fetching initial owed data from: ${getUrl}`);
-
-    try {
-        const response = await fetch(getUrl, {
-            method: 'GET',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-        });
-        
-        if (!response.ok) {
-            const errorText = await response.text();
-            console.error('Failed to fetch initial data. Server responded with:', response.status, errorText);
-            throw new Error(`Server error: ${response.status}`);
-        }
-
-        const result = await response.json();
-        console.log("Full initial data response from script:", result);
-
-        // UNWRAP THE RESPONSE to provide a clean object to the UI
-        if (result && result.data && result.data.success) {
-            return {
-                success: true,
-                owedData: result.data.owedData
-            };
-        } else {
-            // The script itself indicated failure or returned a malformed response
-            const errorMessage = result.message || 'Unknown error from Apps Script.';
-            throw new Error(errorMessage);
-        }
-
-    } catch (error) {
-        console.error("Error processing initial data fetch:", error);
-        if (error instanceof SyntaxError) {
-            console.error("The server response for initial data was not valid JSON.");
-        }
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        return { success: false, message: errorMessage };
-    }
-} 
+// The old testConnection function has been removed as it was obsolete. 
