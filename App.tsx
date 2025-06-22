@@ -6,6 +6,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { AuthProvider } from './src/context/AuthContext';
 import { QueueProvider } from './src/context/QueueContext';
 import AppNavigator from './src/navigation/AppNavigator';
+import WavingHandLoader from './src/components/WavingHandLoader';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -23,7 +24,7 @@ function AppContent() {
   }, [fontsLoaded, fontError]);
 
   if (!fontsLoaded && !fontError) {
-    return null;
+    return <WavingHandLoader size={120} color="#000000" />;
   }
 
   return (

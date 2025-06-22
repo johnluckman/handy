@@ -2,7 +2,8 @@ import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator, StackNavigationProp } from '@react-navigation/stack';
 import { useAuth } from '../context/AuthContext';
-import { ActivityIndicator, View } from 'react-native';
+import { View, StyleSheet } from 'react-native';
+import WavingHandLoader from '../components/WavingHandLoader';
 
 import DashboardScreen from '../screens/DashboardScreen';
 import CashCounterScreen from '../screens/CashCounterScreen';
@@ -46,8 +47,8 @@ export default function AppNavigator(): React.ReactElement {
 
   if (isLoading) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="large" />
+      <View style={styles.loadingContainer}>
+        <WavingHandLoader size={100} color="#39b878" />
       </View>
     );
   }
@@ -57,4 +58,13 @@ export default function AppNavigator(): React.ReactElement {
       {user ? <AppStack /> : <AuthStack />}
     </NavigationContainer>
   );
-} 
+}
+
+const styles = StyleSheet.create({
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
+  },
+}); 

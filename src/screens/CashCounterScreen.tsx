@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { View, Text, StyleSheet, ScrollView, Button, Alert, TextInput, ActivityIndicator, Platform, TouchableWithoutFeedback, Keyboard, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Button, Alert, TextInput, Platform, TouchableWithoutFeedback, Keyboard, TouchableOpacity } from 'react-native';
 import NetInfo, { useNetInfo } from '@react-native-community/netinfo';
 import { LinearGradient } from 'expo-linear-gradient';
 import DenominationRow, { RowData } from '../components/DenominationRow';
@@ -11,6 +11,7 @@ import { useNavigation } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { NavigationProps } from '../navigation/AppNavigator';
 import { useAuth } from '../context/AuthContext'; // Import useAuth
+import WavingHandLoader from '../components/WavingHandLoader';
 
 // Defines the structure for our state, mapping each denomination ID to its RowData
 interface DenominationData {
@@ -176,8 +177,13 @@ export default function CashCounterScreen(): React.ReactElement {
   if (isLoading) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator size="large" color="#007AFF" />
-        <Text>Loading data...</Text>
+        <WavingHandLoader 
+          size={80} 
+          color="#39b878" 
+          text="Loading data..."
+          textColor="#ffffff"
+          backgroundColor="transparent"
+        />
       </View>
     );
   }
@@ -263,9 +269,18 @@ export default function CashCounterScreen(): React.ReactElement {
                 onPress={handleSubmit}
                 disabled={isLoading}
               >
-                <Text style={styles.submitButtonText}>
-                  {isLoading ? 'Submitting...' : 'Submit Count'}
-                </Text>
+                {isLoading ? (
+                  <View style={styles.submitButtonContent}>
+                    <WavingHandLoader 
+                      size={20} 
+                      color="#ffffff" 
+                      compact={true}
+                    />
+                    <Text style={styles.submitButtonText}>Submitting...</Text>
+                  </View>
+                ) : (
+                  <Text style={styles.submitButtonText}>Submit Count</Text>
+                )}
               </TouchableOpacity>
             </View>
           </View>
@@ -403,9 +418,20 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-Bold',
     color: '#fff',
   },
+  submitButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   centered: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  loadingText: {
+    fontSize: 18,
+    fontFamily: 'Inter-Bold',
+    color: '#ffffff',
+    marginTop: 20,
   },
 }); 
