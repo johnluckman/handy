@@ -14,33 +14,22 @@ const AuthContext = createContext<AuthContextData>({} as AuthContextData);
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<string | null>(null);
   const [store, setStore] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    async function loadUser() {
-      const storedUser = await AsyncStorage.getItem('user');
-      const storedStore = await AsyncStorage.getItem('store');
-      if (storedUser && storedStore) {
-        setUser(storedUser);
-        setStore(storedStore);
-      }
-      setIsLoading(false);
-    }
-    loadUser();
+    setIsLoading(false);
   }, []);
 
   const login = async (selectedUser: string, selectedStore: string) => {
+    setIsLoading(true);
     setUser(selectedUser);
     setStore(selectedStore);
-    await AsyncStorage.setItem('user', selectedUser);
-    await AsyncStorage.setItem('store', selectedStore);
+    setIsLoading(false);
   };
 
   const logout = async () => {
     setUser(null);
     setStore(null);
-    await AsyncStorage.removeItem('user');
-    await AsyncStorage.removeItem('store');
   };
 
   return (

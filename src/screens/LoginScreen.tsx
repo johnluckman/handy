@@ -1,99 +1,202 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
-import { Picker } from '@react-native-picker/picker';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { useAuth } from '../context/AuthContext';
-import { STORES, USERS } from '../config/auth';
 import { LinearGradient } from 'expo-linear-gradient';
+import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import DropDownPicker from 'react-native-dropdown-picker';
+import { STORES, USERS } from '../config/auth';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function LoginScreen() {
-  const [store, setStore] = useState<string>(STORES[0]);
-  const [user, setUser] = useState<string>(USERS[0]);
   const { login } = useAuth();
 
-  const handleLogin = () => {
-    login(user, store);
+  const [storeOpen, setStoreOpen] = useState(false);
+  const [storeValue, setStoreValue] = useState(STORES[0]);
+  const [storeItems, setStoreItems] = useState(
+    STORES.map((s) => ({ label: s, value: s }))
+  );
+
+  const [userOpen, setUserOpen] = useState(false);
+  const [userValue, setUserValue] = useState<string | null>(null);
+  const [userItems, setUserItems] = useState(
+    USERS.map((u) => ({ label: u, value: u }))
+  );
+
+  useEffect(() => {
+    const loadLastSelection = async () => {
+      const lastStore = await AsyncStorage.getItem('lastStore');
+      const lastUser = await AsyncStorage.getItem('lastUser');
+      if (lastStore) {
+        setStoreValue(lastStore);
+      } else {
+        setStoreValue(STORES[0]);
+      }
+      if (lastUser) {
+        setUserValue(lastUser);
+      } else {
+        setUserValue(USERS[0]);
+      }
+    };
+    loadLastSelection();
+  }, []);
+
+  const handleLogin = async () => {
+    if (storeValue && userValue) {
+      await AsyncStorage.setItem('lastStore', storeValue);
+      await AsyncStorage.setItem('lastUser', userValue);
+      login(userValue, storeValue);
+    }
   };
 
-  return (
-    <LinearGradient colors={['#39b878', '#2E9A65']} style={styles.container}>
-      <Text style={styles.title}>Welcome</Text>
-      <Text style={styles.subtitle}>Select your store and name to begin</Text>
+  const onStoreOpen = () => {
+    setUserOpen(false);
+  };
 
-      <View style={styles.pickerContainer}>
-        <Text style={styles.label}>Store</Text>
-        <Picker
-          selectedValue={store}
-          onValueChange={(itemValue: string) => setStore(itemValue)}
-          style={styles.picker}
-        >
-          {STORES.map((s) => <Picker.Item key={s} label={s} value={s} />)}
-        </Picker>
+  const onUserOpen = () => {
+    setStoreOpen(false);
+  };
+
+  if (!storeValue || !userValue) {
+    // Render a loading state or null while waiting for async storage
+    return null;
+  }
+
+  return (
+    <LinearGradient colors={['#f2f2f2', '#39b878']} style={styles.gradient}>
+      <View style={styles.header}>
+        <Text style={styles.subtitle}>Select your store and name to begin</Text>
       </View>
 
-      <View style={styles.pickerContainer}>
-        <Text style={styles.label}>User</Text>
-        <Picker
-          selectedValue={user}
-          onValueChange={(itemValue: string) => setUser(itemValue)}
-          style={styles.picker}
-        >
-          {USERS.map((u) => <Picker.Item key={u} label={u} value={u} />)}
-        </Picker>
+      <View style={styles.inputContainer}>
+        <DropDownPicker
+          open={storeOpen}
+          value={storeValue}
+          items={storeItems}
+          setOpen={setStoreOpen}
+          setValue={setStoreValue}
+          setItems={setStoreItems}
+          onOpen={onStoreOpen}
+          placeholder="Select a store"
+          style={styles.dropdown}
+          placeholderStyle={styles.placeholder}
+          dropDownContainerStyle={styles.dropdownContainer}
+          textStyle={styles.dropdownText}
+          arrowIconStyle={styles.arrowIcon}
+          tickIconStyle={styles.tickIcon}
+          TickIconComponent={() => <Icon name="check" size={20} color="#2E9A65" />}
+          ArrowDownIconComponent={({style}) => <Icon name="chevron-down" size={20} color="#555" style={style} />}
+          ArrowUpIconComponent={({style}) => <Icon name="chevron-up" size={20} color="#555" style={style} />}
+          zIndex={2000}
+          zIndexInverse={1000}
+        />
+
+        <View style={{ height: 20 }} />
+
+        <DropDownPicker
+          open={userOpen}
+          value={userValue}
+          items={userItems}
+          setOpen={setUserOpen}
+          setValue={setUserValue}
+          setItems={setUserItems}
+          onOpen={onUserOpen}
+          placeholder="Select a user"
+          style={styles.dropdown}
+          placeholderStyle={styles.placeholder}
+          dropDownContainerStyle={styles.dropdownContainer}
+          textStyle={styles.dropdownText}
+          arrowIconStyle={styles.arrowIcon}
+          tickIconStyle={styles.tickIcon}
+          TickIconComponent={() => <Icon name="check" size={20} color="#2E9A65" />}
+          ArrowDownIconComponent={({style}) => <Icon name="chevron-down" size={20} color="#555" style={style} />}
+          ArrowUpIconComponent={({style}) => <Icon name="chevron-up" size={20} color="#555" style={style} />}
+          zIndex={1000}
+          zIndexInverse={2000}
+        />
       </View>
 
       <TouchableOpacity style={styles.button} onPress={handleLogin}>
         <Text style={styles.buttonText}>Login</Text>
+        <Icon name="arrow-right" style={styles.buttonIcon} />
       </TouchableOpacity>
     </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  gradient: {
     flex: 1,
     justifyContent: 'center',
-    padding: 20,
+    padding: 30,
   },
-  title: {
-    fontSize: 40,
-    fontFamily: 'Inter-Bold',
-    color: '#fff',
-    textAlign: 'center',
-    marginBottom: 10,
+  header: {
+    alignItems: 'center',
+    marginBottom: 40,
   },
   subtitle: {
     fontSize: 18,
     fontFamily: 'Inter-Regular',
-    color: '#fff',
+    color: '#555',
     textAlign: 'center',
-    marginBottom: 40,
   },
-  pickerContainer: {
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    borderRadius: 10,
-    marginBottom: 20,
+  inputContainer: {
+    marginBottom: 30,
+    zIndex: 1,
   },
-  label: {
-    color: '#fff',
+  dropdown: {
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#ddd',
+    height: 55,
+    borderRadius: 15,
+  },
+  placeholder: {
+    color: '#aaa',
     fontFamily: 'Inter-SemiBold',
-    paddingLeft: 15,
-    paddingTop: 10,
-    fontSize: 16,
   },
-  picker: {
-    color: '#fff',
+  dropdownContainer: {
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 15,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 10,
+  },
+  dropdownText: {
+    color: '#2E9A65',
+    fontFamily: 'Inter-SemiBold',
+  },
+  arrowIcon: {
+    // This style is passed to the icon component, but size and color are set directly
+  },
+  tickIcon: {
+    width: 20,
+    height: 20,
   },
   button: {
+    flexDirection: 'row',
     backgroundColor: '#fff',
     borderRadius: 50,
-    paddingVertical: 15,
+    paddingVertical: 18,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 5,
+    elevation: 8,
   },
   buttonText: {
-    fontSize: 16,
+    fontSize: 18,
     fontFamily: 'Inter-Bold',
+    color: '#2E9A65',
+    marginRight: 10,
+  },
+  buttonIcon: {
+    fontSize: 20,
     color: '#2E9A65',
   },
 }); 

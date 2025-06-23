@@ -2,6 +2,8 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, FlatList } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NavigationProps } from '../navigation/AppNavigator';
+import { useAuth } from '../context/AuthContext';
+import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 const tools = [
   { id: '1', name: 'Cash Counter' },
@@ -16,6 +18,7 @@ const tools = [
  */
 export default function DashboardScreen(): React.ReactElement {
   const navigation = useNavigation<NavigationProps>();
+  const { user, store, logout } = useAuth();
 
   const handlePress = (toolName: string) => {
     if (toolName === 'Cash Counter') {
@@ -32,7 +35,17 @@ export default function DashboardScreen(): React.ReactElement {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Handy Toolkit</Text>
+      <View style={styles.header}>
+        <TouchableOpacity style={styles.headerItem} onPress={logout}>
+          <Icon name="account-outline" size={24} color="#555" />
+          <Text style={styles.headerText}>{user}</Text>
+        </TouchableOpacity>
+        <View style={styles.headerItem}>
+          <Icon name="storefront-outline" size={24} color="#555" />
+          <Text style={styles.headerText}>{store}</Text>
+        </View>
+      </View>
+      <Text style={styles.title}>Handy</Text>
       <FlatList
         data={tools}
         renderItem={renderTool}
@@ -48,14 +61,36 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f5f5f5',
+    paddingTop: 60,
+    paddingHorizontal: 20,
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingTop: 80,
+    width: '100%',
+    marginBottom: 20,
+  },
+  headerItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.05)',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+  },
+  headerText: {
+    marginLeft: 8,
+    fontSize: 16,
+    color: '#333',
+    fontWeight: '600',
   },
   title: {
     fontSize: 32,
     fontWeight: 'bold',
-    marginBottom: 40,
+    marginBottom: 20,
     color: '#333',
+    textAlign: 'center',
   },
   list: {
     width: '100%',

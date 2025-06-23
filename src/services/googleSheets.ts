@@ -1,4 +1,4 @@
-import { GOOGLE_SHEET_ID, APPS_SCRIPT_URL } from '@env';
+import { EXPO_PUBLIC_GOOGLE_SHEET_ID, EXPO_PUBLIC_APPS_SCRIPT_URL } from '@env';
 
 /**
  * IMPORTANT: BACKEND CHANGE REQUIRED
@@ -26,19 +26,19 @@ interface SubmissionData {
  * @returns {Promise<any>} The response from the Google Apps Script.
  */
 export async function appendToSheet(batch: object[]): Promise<{ success: boolean; message?: string }> {
-  if (!APPS_SCRIPT_URL) {
+  if (!EXPO_PUBLIC_APPS_SCRIPT_URL) {
     console.warn('Google Apps Script URL is not defined. Using mock implementation.');
     return mockAppendToSheet(batch);
   }
 
   try {
-    const response = await fetch(APPS_SCRIPT_URL, {
+    const response = await fetch(EXPO_PUBLIC_APPS_SCRIPT_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        sheetId: GOOGLE_SHEET_ID,
+        sheetId: EXPO_PUBLIC_GOOGLE_SHEET_ID,
         data: batch, // The script now expects a 'data' property
       }),
     });
@@ -88,12 +88,12 @@ async function mockAppendToSheet(batch: object[]): Promise<any> {
  * This is used to populate the initial float values in the cash counter.
  */
 export async function fetchOwedData(): Promise<{ [key: string]: number } | null> {
-  if (!APPS_SCRIPT_URL) {
+  if (!EXPO_PUBLIC_APPS_SCRIPT_URL) {
     console.warn('Google Apps Script URL is not defined. Cannot fetch owed data.');
     return null;
   }
 
-  const url = `${APPS_SCRIPT_URL}?action=getOwedData`;
+  const url = `${EXPO_PUBLIC_APPS_SCRIPT_URL}?action=getOwedData`;
 
   try {
     const response = await fetch(url, {

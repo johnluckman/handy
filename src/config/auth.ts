@@ -1,10 +1,13 @@
-export const STORES = ['Newtown', 'Paddington', 'Warehouse'];
+export const STORES = ['Newtown', 'Paddington'];
 
 export const USERS = [
+  'Beth',
+  'Chiara',
+  'Iris',
+  'Mishka',
+  'Sasha',
+  'Vincy',
+  'Holly',
   'John',
-  'Jane',
-  'Peter',
-  'Sally',
-  'Mark',
-  'Sarah',
+  'Frances',
 ]; 

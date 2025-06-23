@@ -141,7 +141,7 @@ export default function CashCounterScreen(): React.ReactElement {
     }, {} as { [id: string]: { count: number; float: number; borrow: number; returned: number } });
 
     const submissionData = {
-      timestamp: new Date().toISOString(),
+      date: new Date().toISOString(),
       user: userName,
       store: store,
       notes: notes,
