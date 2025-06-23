@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { View, Text, StyleSheet, ScrollView, Button, Alert, TextInput, Platform, TouchableWithoutFeedback, Keyboard, TouchableOpacity } from 'react-native';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { View, Text, StyleSheet, ScrollView, Button, Alert, TextInput, Platform, TouchableWithoutFeedback, Keyboard, TouchableOpacity, Modal, FlatList, Dimensions, Image, Pressable } from 'react-native';
 import NetInfo, { useNetInfo } from '@react-native-community/netinfo';
 import { LinearGradient } from 'expo-linear-gradient';
 import DenominationRow, { RowData } from '../components/DenominationRow';
@@ -11,7 +11,7 @@ import { useNavigation } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { NavigationProps } from '../navigation/AppNavigator';
 import { useAuth } from '../context/AuthContext'; // Import useAuth
-import WavingHandLoader from '../components/WavingHandLoader';
+import LoadingScreen from '../components/LoadingScreen';
 
 // Defines the structure for our state, mapping each denomination ID to its RowData
 interface DenominationData {
@@ -24,14 +24,43 @@ const initializeState = (): DenominationData => {
   denominations.forEach(d => {
     initialState[d.id] = {
       actualCount: 0,
-      targetFloat: d.targetCount,
-      borrow: d.targetCount,
+      actualFloat: 0,
+      borrow: 0,
       returned: 0,
       owed: 0, // Initialize 'owed' to 0
     };
   });
   return initialState;
 };
+
+// --- Instructions Data ---
+// TODO: Replace placeholders with actual images.
+const instructions = [
+  {
+    key: '1',
+    text: 'Step 1: Count everything in the till and enter in "Count" column.',
+    // image: require('../assets/instructions/step1.png'), 
+  },
+  {
+    key: '2',
+    text: 'Step 2: Take out the recommended float for the till and enter in "Float" column.',
+    // image: require('../assets/instructions/step2.png'),
+  },
+  {
+    key: '3',
+    text: 'Step 3: If you dont have enough for the float, you can borrow from the safe and enter in "Borrow" column.',
+    // image: require('../assets/instructions/step2.png'),
+  },
+  {
+    key: '4',
+    text: 'Step 4: If the safe is "Owed" any notes/coins and you have a surplus, you can return the Owed amount to the safe and enter it in "Returned" column.',
+    // image: require('../assets/instructions/step3.png'),
+  },
+];
+const { width } = Dimensions.get('window');
+// Match the modal's inner width (90% of screen width - 20 padding on each side)
+const modalSlideWidth = width * 0.9 - 40;
+// -------------------------
 
 /**
  * @returns {React.ReactElement} The Cash Counter screen component.
@@ -43,7 +72,18 @@ export default function CashCounterScreen(): React.ReactElement {
   const [data, setData] = useState<DenominationData>(initializeState());
   const [notes, setNotes] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isInstructionsVisible, setInstructionsVisible] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(0);
   const queueContext = useQueue();
+  const flatListRef = useRef<FlatList<any>>(null);
+
+  const onViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: Array<any> }) => {
+    if (viewableItems.length > 0) {
+      setActiveIndex(viewableItems[0].index || 0);
+    }
+  }).current;
+
+  const viewabilityConfig = useRef({ viewAreaCoveragePercentThreshold: 50 }).current;
 
   const loadInitialData = useCallback(async () => {
     setIsLoading(true);
@@ -86,27 +126,27 @@ export default function CashCounterScreen(): React.ReactElement {
     return calculateTotal();
   }, [data, calculateTotal]);
 
-  const { totalTargetFloat, idealFloat, totalBorrowed, totalReturned } = useMemo(() => {
+  const { totalActualFloat, idealFloat, totalBorrowed, totalReturned } = useMemo(() => {
     const idealFloatCalc = denominations.reduce(
-      (sum, deno) => sum + deno.targetCount * deno.value,
+      (sum, deno) => sum + deno.targetFloat * deno.value,
       0
     );
 
-    let targetFloat = 0;
+    let actualFloat = 0;
     let borrowed = 0;
     let returned = 0;
 
     for (const id in data) {
       const denomination = denominations.find(d => d.id === id);
       if (denomination) {
-        targetFloat += (data[id].targetFloat || 0) * denomination.value;
+        actualFloat += ((data[id]?.actualFloat ?? 0) * denomination.value);
         borrowed += (data[id].borrow || 0) * denomination.value;
         returned += (data[id].returned || 0) * denomination.value;
       }
     }
 
     return {
-      totalTargetFloat: targetFloat,
+      totalActualFloat: actualFloat,
       idealFloat: idealFloatCalc,
       totalBorrowed: borrowed,
       totalReturned: returned,
@@ -124,7 +164,7 @@ export default function CashCounterScreen(): React.ReactElement {
 
     const flatData = denominations.flatMap(d => {
       const row = data[d.id];
-      return [row.actualCount, row.targetFloat, row.borrow, row.returned];
+      return [row.actualCount, row.actualFloat, row.borrow, row.returned];
     });
 
     // The Apps Script expects specific keys ('count', 'float') for the denomination data.
@@ -133,7 +173,7 @@ export default function CashCounterScreen(): React.ReactElement {
       const original = data[key];
       acc[key] = {
         count: original.actualCount,
-        float: original.targetFloat,
+        float: original.actualFloat,
         borrow: original.borrow,
         returned: original.returned,
       };
@@ -177,11 +217,9 @@ export default function CashCounterScreen(): React.ReactElement {
   if (isLoading) {
     return (
       <View style={styles.centered}>
-        <WavingHandLoader 
+        <LoadingScreen 
           size={80} 
-          color="#39b878" 
           text="Loading data..."
-          textColor="#ffffff"
           backgroundColor="transparent"
         />
       </View>
@@ -190,6 +228,64 @@ export default function CashCounterScreen(): React.ReactElement {
 
   return (
     <View style={styles.screen}>
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={isInstructionsVisible}
+        onRequestClose={() => setInstructionsVisible(false)}
+      >
+        <View style={styles.modalContainer}>
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={() => setInstructionsVisible(false)}
+          />
+          <View style={styles.modalContent}>
+            <TouchableOpacity
+              style={styles.closeIcon}
+              onPress={() => setInstructionsVisible(false)}
+            >
+              <Icon name="close" size={24} color="#999" />
+            </TouchableOpacity>
+            <Text style={styles.modalTitle}>How to Use</Text>
+            <View style={styles.sliderArea}>
+              <FlatList
+                ref={flatListRef}
+                data={instructions}
+                renderItem={({ item }) => (
+                  <View style={styles.slide}>
+                    <View style={styles.instructionImagePlaceholder}>
+                      <Text style={{color: '#999'}}>Image Placeholder</Text>
+                    </View>
+                    <Text style={styles.instructionText}>{item.text}</Text>
+                  </View>
+                )}
+                horizontal
+                pagingEnabled
+                showsHorizontalScrollIndicator={false}
+                keyExtractor={item => item.key}
+                style={{ width: modalSlideWidth }}
+                onViewableItemsChanged={onViewableItemsChanged}
+                viewabilityConfig={viewabilityConfig}
+              />
+              <View style={styles.pagination}>
+                {instructions.map((_, index) => (
+                  <Pressable
+                    key={index}
+                    onPress={() => {
+                      flatListRef.current?.scrollToIndex({ index, animated: true });
+                    }}
+                    style={[
+                      styles.dot,
+                      { backgroundColor: index === activeIndex ? '#39b878' : '#e0e0e0' },
+                    ]}
+                  />
+                ))}
+              </View>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       <ScrollView
         style={{ flex: 1 }}
         keyboardShouldPersistTaps="handled"
@@ -222,15 +318,22 @@ export default function CashCounterScreen(): React.ReactElement {
         <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
           <View style={styles.contentWrapper}>
             {/* <Text style={styles.title}>Cash Count</Text> */}
-            <View style={styles.userInputsContainer}>
-              <TextInput
-                style={styles.textInput}
-                placeholder="Add notes (e.g., End of Day Till 1)"
-                value={notes}
-                onChangeText={setNotes}
-              />
+            <View style={styles.instructionsRow}>
+              <TouchableOpacity
+                style={styles.instructionsButton}
+                onPress={() => setInstructionsVisible(true)}
+              >
+                <Icon name="help-circle-outline" size={20} color="#39b878" />
+                <Text style={styles.instructionsButtonText}>Instructions</Text>
+              </TouchableOpacity>
+              <View style={styles.userStoreInfo}>
+                <Icon name="account-outline" size={16} color="#888" />
+                <Text style={styles.userStoreText}>{userName}</Text>
+                <Icon name="storefront-outline" size={16} color="#888" style={{ marginLeft: 10 }} />
+                <Text style={styles.userStoreText}>{store}</Text>
+              </View>
             </View>
-
+            
             <View style={styles.list}>
               {denominations.map((item: Denomination) => (
                 <DenominationRow
@@ -242,6 +345,15 @@ export default function CashCounterScreen(): React.ReactElement {
               ))}
             </View>
 
+            <View style={styles.userInputsContainer}>
+              <TextInput
+                style={styles.textInput}
+                placeholder="Add notes (e.g., End of Day Till 1)"
+                value={notes}
+                onChangeText={setNotes}
+              />
+            </View>
+
             <View style={styles.summaryContainer}>
               <View style={styles.summaryRow}>
                 <Text style={styles.totalLabel}>Count Total:</Text>
@@ -249,9 +361,9 @@ export default function CashCounterScreen(): React.ReactElement {
               </View>
               <View style={styles.summaryRow}>
                 <Text style={styles.summaryLabel}>
-                  Float total: {totalTargetFloat === idealFloat ? '✅' : '❌'}
+                  Float total: {totalActualFloat === idealFloat ? '✅' : '❌'}
                 </Text>
-                <Text style={styles.summaryValue}>{`$${totalTargetFloat.toFixed(2)} / $${idealFloat.toFixed(2)}`}</Text>
+                <Text style={styles.summaryValue}>{`$${totalActualFloat.toFixed(2)} / $${idealFloat.toFixed(2)}`}</Text>
               </View>
               <View style={styles.summaryRow}>
                 <Text style={styles.summaryLabel}>Borrowed Total:</Text>
@@ -271,9 +383,8 @@ export default function CashCounterScreen(): React.ReactElement {
               >
                 {isLoading ? (
                   <View style={styles.submitButtonContent}>
-                    <WavingHandLoader 
+                    <LoadingScreen 
                       size={20} 
-                      color="#ffffff" 
                       compact={true}
                     />
                     <Text style={styles.submitButtonText}>Submitting...</Text>
@@ -433,5 +544,132 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-Bold',
     color: '#ffffff',
     marginTop: 20,
+  },
+  instructionsButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    marginBottom: 8,
+    backgroundColor: '#e8f5e9',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#c8e6c9'
+  },
+  instructionsButtonText: {
+    marginLeft: 6,
+    fontSize: 14,
+    fontFamily: 'Inter-SemiBold',
+    color: '#388e3c',
+  },
+  // --- Modal Styles ---
+  modalContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+  },
+  modalContent: {
+    width: '90%',
+    maxWidth: 400,
+    backgroundColor: 'white',
+    borderRadius: 20,
+    padding: 20,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  closeIcon: {
+    position: 'absolute',
+    top: 15,
+    right: 15,
+    zIndex: 1,
+  },
+  modalTitle: {
+    fontSize: 22,
+    fontFamily: 'Inter-Bold',
+    marginBottom: 15,
+    color: '#333',
+  },
+  slide: {
+    width: modalSlideWidth,
+    alignItems: 'center',
+  },
+  instructionImagePlaceholder: {
+    width: '100%',
+    aspectRatio: 16/9,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 10,
+    marginBottom: 15,
+    justifyContent: 'center',
+    alignItems: 'center'
+  },
+  instructionText: {
+    fontSize: 16,
+    textAlign: 'center',
+    fontFamily: 'Inter-Regular',
+    minHeight: 50,
+    color: '#555',
+  },
+  pagination: {
+    flexDirection: 'row',
+    marginVertical: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dot: {
+    height: 10,
+    width: 10,
+    borderRadius: 5,
+    marginHorizontal: 8,
+  },
+  slideIndicator: {
+    fontSize: 14,
+    color: '#aaa',
+    fontFamily: 'Inter-Regular',
+    marginTop: 10,
+    marginBottom: 20,
+  },
+  closeButton: {
+    backgroundColor: '#39b878',
+    borderRadius: 50,
+    paddingVertical: 12,
+    paddingHorizontal: 30,
+    elevation: 2,
+  },
+  closeButtonText: {
+    color: 'white',
+    fontFamily: 'Inter-Bold',
+    fontSize: 16,
+  },
+  sliderArea: {
+    alignItems: 'center',
+    width: modalSlideWidth,
+  },
+  instructionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    width: '100%',
+    marginBottom: 8,
+  },
+  userStoreInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginLeft: 10,
+    marginTop: -3,
+  },
+  userStoreText: {
+    fontSize: 13,
+    color: '#888',
+    fontFamily: 'Inter-SemiBold',
+    marginLeft: 4,
   },
 }); 

@@ -3,7 +3,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator, StackNavigationProp } from '@react-navigation/stack';
 import { useAuth } from '../context/AuthContext';
 import { View, StyleSheet } from 'react-native';
-import WavingHandLoader from '../components/WavingHandLoader';
+import LoadingScreen from '../components/LoadingScreen';
 
 import DashboardScreen from '../screens/DashboardScreen';
 import CashCounterScreen from '../screens/CashCounterScreen';
@@ -48,7 +48,7 @@ export default function AppNavigator(): React.ReactElement {
   if (isLoading) {
     return (
       <View style={styles.loadingContainer}>
-        <WavingHandLoader size={100} color="#39b878" />
+        <LoadingScreen size={100} />
       </View>
     );
   }

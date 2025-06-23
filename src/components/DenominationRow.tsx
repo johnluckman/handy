@@ -11,7 +11,7 @@ interface DenominationRowProps {
 
 export interface RowData {
   actualCount: number;
-  targetFloat: number;
+  actualFloat: number;
   borrow: number;
   returned: number;
   owed: number;
@@ -24,11 +24,10 @@ export default function DenominationRow({ denomination, rowData, onRowDataChange
     const newCount = parseInt(text, 10) || 0;
     const newRowData = { ...rowData, [field]: newCount };
 
-    // Auto-calculate borrow amount ONLY if the user is not currently editing it.
-    // This allows the user to override the calculation.
-    if (field !== 'borrow') {
-        const target = field === 'targetFloat' ? newCount : newRowData.targetFloat;
-        const actual = field === 'actualCount' ? newCount : newRowData.actualCount;
+    // Only recalculate borrow when editing actualFloat
+    if (field === 'actualFloat') {
+        const target = denomination.targetFloat;
+        const actual = newCount;
         newRowData.borrow = Math.max(0, target - actual);
     }
 
@@ -36,7 +35,7 @@ export default function DenominationRow({ denomination, rowData, onRowDataChange
   };
 
   const actualValue = rowData.actualCount * value;
-  const targetValue = rowData.targetFloat * value;
+  const floatValue = (rowData.actualFloat ?? 0) * value;
 
   return (
     <View style={styles.container}>
@@ -56,7 +55,7 @@ export default function DenominationRow({ denomination, rowData, onRowDataChange
           <TextInput
             style={styles.input}
             keyboardType="number-pad"
-            value={rowData.actualCount.toString()}
+            value={(rowData.actualCount ?? 0).toString()}
             onChangeText={(text) => handleInputChange('actualCount', text)}
             placeholder="0"
             selectTextOnFocus={true}
@@ -64,21 +63,26 @@ export default function DenominationRow({ denomination, rowData, onRowDataChange
           <Text style={styles.valueText}>{`$${actualValue.toFixed(2)}`}</Text>
         </View>
 
-        {/* Target Float */}
+        {/* Actual Float */}
         <View style={styles.inputGroup}>
           <View style={styles.labelContainer}>
-            <Text style={styles.label}>{`Float (${denomination.targetCount})`}</Text>
+            <Text style={styles.label}>{`Float (${denomination.targetFloat})`}</Text>
           </View>
           <TextInput
-            style={[styles.input, denomination.value === 100 && styles.disabledInput]}
+            style={[
+              styles.input,
+              denomination.value === 100
+                ? styles.disabledInput
+                : (denomination.targetFloat === rowData.actualFloat && styles.floatMatchInput),
+            ]}
             keyboardType="number-pad"
-            value={rowData.targetFloat.toString()}
-            onChangeText={(text) => handleInputChange('targetFloat', text)}
+            value={(rowData.actualFloat ?? 0).toString()}
+            onChangeText={(text) => handleInputChange('actualFloat', text)}
             placeholder="0"
             editable={denomination.value !== 100}
             selectTextOnFocus={true}
           />
-          <Text style={styles.valueText}>{`$${targetValue.toFixed(2)}`}</Text>
+          <Text style={styles.valueText}>{`$${floatValue.toFixed(2)}`}</Text>
         </View>
 
         {/* Borrow */}
@@ -88,12 +92,16 @@ export default function DenominationRow({ denomination, rowData, onRowDataChange
             <Text style={styles.label}>Borrow</Text>
           </View>
           <TextInput
-            style={[styles.input, denomination.value === 100 && styles.disabledInput]}
+            style={[
+              styles.input,
+              denomination.value === 100 && styles.disabledInput,
+              (denomination.targetFloat === rowData.actualFloat) && styles.borrowDisabledInput,
+            ]}
             keyboardType="number-pad"
-            value={rowData.borrow.toString()}
+            value={(rowData.borrow ?? 0).toString()}
             onChangeText={(text) => handleInputChange('borrow', text)}
             placeholder="0"
-            editable={denomination.value !== 100}
+            editable={denomination.value !== 100 && denomination.targetFloat !== rowData.actualFloat}
             selectTextOnFocus={true}
           />
         </View>
@@ -108,9 +116,9 @@ export default function DenominationRow({ denomination, rowData, onRowDataChange
             style={[
               styles.input,
               styles.readOnlyInput,
-              rowData.owed > 0 && styles.owedInput,
+              (rowData.owed ?? 0) > 0 && styles.owedInput,
             ]}
-            value={rowData.owed > 0 ? `-${rowData.owed}` : '0'}
+            value={(rowData.owed ?? 0) > 0 ? `-${rowData.owed}` : '0'}
             editable={false}
           />
         </View>
@@ -122,12 +130,16 @@ export default function DenominationRow({ denomination, rowData, onRowDataChange
             <Text style={styles.label}>Returned</Text>
           </View>
           <TextInput
-            style={[styles.input, denomination.value === 100 && styles.disabledInput]}
+            style={[
+              styles.input,
+              denomination.value === 100 && styles.disabledInput,
+              (rowData.owed === 0) && styles.returnedDisabledInput,
+            ]}
             keyboardType="number-pad"
-            value={rowData.returned.toString()}
+            value={(rowData.returned ?? 0).toString()}
             onChangeText={(text) => handleInputChange('returned', text)}
             placeholder="0"
-            editable={denomination.value !== 100}
+            editable={denomination.value !== 100 && rowData.owed !== 0}
             selectTextOnFocus={true}
           />
         </View>
@@ -142,15 +154,11 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 10,
     marginBottom: 10,
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
   },
   denominationInfo: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
     paddingBottom: 10,
   },
   image: {
@@ -213,5 +221,17 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#007AFF',
     marginTop: 4,
+  },
+  floatMatchInput: {
+    backgroundColor: '#a8e6c7', // lighter brand green
+    borderColor: '#39b878', // brand green
+  },
+  borrowDisabledInput: {
+    backgroundColor: '#eee',
+    color: '#aaa',
+  },
+  returnedDisabledInput: {
+    backgroundColor: '#eee',
+    color: '#aaa',
   },
 }); 
