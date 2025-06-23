@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Animated } from 'react-native';
 import { useAuth } from '../context/AuthContext';
 import { LinearGradient } from 'expo-linear-gradient';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -22,6 +22,8 @@ export default function LoginScreen() {
     USERS.map((u) => ({ label: u, value: u }))
   );
 
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+
   useEffect(() => {
     const loadLastSelection = async () => {
       const lastStore = await AsyncStorage.getItem('lastStore');
@@ -38,6 +40,14 @@ export default function LoginScreen() {
       }
     };
     loadLastSelection();
+  }, []);
+
+  useEffect(() => {
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 600,
+      useNativeDriver: true,
+    }).start();
   }, []);
 
   const handleLogin = async () => {
@@ -62,64 +72,66 @@ export default function LoginScreen() {
   }
 
   return (
-    <LinearGradient colors={['#f2f2f2', '#39b878']} style={styles.gradient}>
-      <View style={styles.header}>
-        <Text style={styles.subtitle}>Select your store and name to begin</Text>
-      </View>
+    <Animated.View style={{ flex: 1, opacity: fadeAnim }}>
+      <LinearGradient colors={['#f2f2f2', '#39b878']} style={styles.gradient}>
+        <View style={styles.header}>
+          <Text style={styles.subtitle}>Select your store and name to begin</Text>
+        </View>
 
-      <View style={styles.inputContainer}>
-        <DropDownPicker
-          open={storeOpen}
-          value={storeValue}
-          items={storeItems}
-          setOpen={setStoreOpen}
-          setValue={setStoreValue}
-          setItems={setStoreItems}
-          onOpen={onStoreOpen}
-          placeholder="Select a store"
-          style={styles.dropdown}
-          placeholderStyle={styles.placeholder}
-          dropDownContainerStyle={styles.dropdownContainer}
-          textStyle={styles.dropdownText}
-          arrowIconStyle={styles.arrowIcon}
-          tickIconStyle={styles.tickIcon}
-          TickIconComponent={() => <Icon name="check" size={20} color="#2E9A65" />}
-          ArrowDownIconComponent={({style}) => <Icon name="chevron-down" size={20} color="#555" style={style} />}
-          ArrowUpIconComponent={({style}) => <Icon name="chevron-up" size={20} color="#555" style={style} />}
-          zIndex={2000}
-          zIndexInverse={1000}
-        />
+        <View style={styles.inputContainer}>
+          <DropDownPicker
+            open={storeOpen}
+            value={storeValue}
+            items={storeItems}
+            setOpen={setStoreOpen}
+            setValue={setStoreValue}
+            setItems={setStoreItems}
+            onOpen={onStoreOpen}
+            placeholder="Select a store"
+            style={styles.dropdown}
+            placeholderStyle={styles.placeholder}
+            dropDownContainerStyle={styles.dropdownContainer}
+            textStyle={styles.dropdownText}
+            arrowIconStyle={styles.arrowIcon}
+            tickIconStyle={styles.tickIcon}
+            TickIconComponent={() => <Icon name="check" size={20} color="#2E9A65" />}
+            ArrowDownIconComponent={({style}) => <Icon name="chevron-down" size={20} color="#555" style={style} />}
+            ArrowUpIconComponent={({style}) => <Icon name="chevron-up" size={20} color="#555" style={style} />}
+            zIndex={2000}
+            zIndexInverse={1000}
+          />
 
-        <View style={{ height: 20 }} />
+          <View style={{ height: 20 }} />
 
-        <DropDownPicker
-          open={userOpen}
-          value={userValue}
-          items={userItems}
-          setOpen={setUserOpen}
-          setValue={setUserValue}
-          setItems={setUserItems}
-          onOpen={onUserOpen}
-          placeholder="Select a user"
-          style={styles.dropdown}
-          placeholderStyle={styles.placeholder}
-          dropDownContainerStyle={styles.dropdownContainer}
-          textStyle={styles.dropdownText}
-          arrowIconStyle={styles.arrowIcon}
-          tickIconStyle={styles.tickIcon}
-          TickIconComponent={() => <Icon name="check" size={20} color="#2E9A65" />}
-          ArrowDownIconComponent={({style}) => <Icon name="chevron-down" size={20} color="#555" style={style} />}
-          ArrowUpIconComponent={({style}) => <Icon name="chevron-up" size={20} color="#555" style={style} />}
-          zIndex={1000}
-          zIndexInverse={2000}
-        />
-      </View>
+          <DropDownPicker
+            open={userOpen}
+            value={userValue}
+            items={userItems}
+            setOpen={setUserOpen}
+            setValue={setUserValue}
+            setItems={setUserItems}
+            onOpen={onUserOpen}
+            placeholder="Select a user"
+            style={styles.dropdown}
+            placeholderStyle={styles.placeholder}
+            dropDownContainerStyle={styles.dropdownContainer}
+            textStyle={styles.dropdownText}
+            arrowIconStyle={styles.arrowIcon}
+            tickIconStyle={styles.tickIcon}
+            TickIconComponent={() => <Icon name="check" size={20} color="#2E9A65" />}
+            ArrowDownIconComponent={({style}) => <Icon name="chevron-down" size={20} color="#555" style={style} />}
+            ArrowUpIconComponent={({style}) => <Icon name="chevron-up" size={20} color="#555" style={style} />}
+            zIndex={1000}
+            zIndexInverse={2000}
+          />
+        </View>
 
-      <TouchableOpacity style={styles.button} onPress={handleLogin}>
-        <Text style={styles.buttonText}>Login</Text>
-        <Icon name="arrow-right" style={styles.buttonIcon} />
-      </TouchableOpacity>
-    </LinearGradient>
+        <TouchableOpacity style={styles.button} onPress={handleLogin}>
+          <Text style={styles.buttonText}>Login</Text>
+          <Icon name="arrow-right" style={styles.buttonIcon} />
+        </TouchableOpacity>
+      </LinearGradient>
+    </Animated.View>
   );
 }
 
@@ -144,11 +156,11 @@ const styles = StyleSheet.create({
     zIndex: 1,
   },
   dropdown: {
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: '#ddd',
+    backgroundColor: 'rgba(255,255,255,0.85)',
+    borderWidth: 0,
     height: 55,
-    borderRadius: 15,
+    borderRadius: 4,
+    paddingLeft: 18,
   },
   placeholder: {
     color: '#aaa',
@@ -156,17 +168,17 @@ const styles = StyleSheet.create({
   },
   dropdownContainer: {
     backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 15,
+    borderWidth: 0,
+    borderRadius: 4,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 5 },
     shadowOpacity: 0.1,
     shadowRadius: 10,
     elevation: 10,
+    paddingLeft: 8,
   },
   dropdownText: {
-    color: '#2E9A65',
+    color: '#222',
     fontFamily: 'Inter-SemiBold',
   },
   arrowIcon: {
@@ -178,7 +190,7 @@ const styles = StyleSheet.create({
   },
   button: {
     flexDirection: 'row',
-    backgroundColor: '#fff',
+    backgroundColor: '#000',
     borderRadius: 50,
     paddingVertical: 18,
     alignItems: 'center',
@@ -192,11 +204,11 @@ const styles = StyleSheet.create({
   buttonText: {
     fontSize: 18,
     fontFamily: 'Inter-Bold',
-    color: '#2E9A65',
+    color: '#fff',
     marginRight: 10,
   },
   buttonIcon: {
     fontSize: 20,
-    color: '#2E9A65',
+    color: '#fff',
   },
 }); 

@@ -39,22 +39,22 @@ const instructions = [
   {
     key: '1',
     text: 'Step 1: Count everything in the till and enter in "Count" column.',
-    // image: require('../assets/instructions/step1.png'), 
+    image: require('../assets/instructions/cash-count-1.png'),
   },
   {
     key: '2',
     text: 'Step 2: Take out the recommended float for the till and enter in "Float" column.',
-    // image: require('../assets/instructions/step2.png'),
+    image: require('../assets/instructions/cash-count-2.png'),
   },
   {
     key: '3',
     text: 'Step 3: If you dont have enough for the float, you can borrow from the safe and enter in "Borrow" column.',
-    // image: require('../assets/instructions/step2.png'),
+    image: require('../assets/instructions/cash-count-3.png'),
   },
   {
     key: '4',
     text: 'Step 4: If the safe is "Owed" any notes/coins and you have a surplus, you can return the Owed amount to the safe and enter it in "Returned" column.',
-    // image: require('../assets/instructions/step3.png'),
+    image: require('../assets/instructions/cash-count-4.png'),
   },
 ];
 const { width } = Dimensions.get('window');
@@ -254,7 +254,7 @@ export default function CashCounterScreen(): React.ReactElement {
                 renderItem={({ item }) => (
                   <View style={styles.slide}>
                     <View style={styles.instructionImagePlaceholder}>
-                      <Text style={{color: '#999'}}>Image Placeholder</Text>
+                      <Image source={item.image} style={styles.instructionImage} />
                     </View>
                     <Text style={styles.instructionText}>{item.text}</Text>
                   </View>
@@ -610,6 +610,11 @@ const styles = StyleSheet.create({
     marginBottom: 15,
     justifyContent: 'center',
     alignItems: 'center'
+  },
+  instructionImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 10,
   },
   instructionText: {
     fontSize: 16,
