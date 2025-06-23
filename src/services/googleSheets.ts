@@ -86,17 +86,23 @@ async function mockAppendToSheet(batch: object[]): Promise<any> {
 /**
  * Fetches the current "Owed" data from the summary sheet in Google Sheets.
  * This is used to populate the initial float values in the cash counter.
+ * @param {string} store - The store name to fetch owed data for (e.g., "Newtown", "Paddington")
  */
-export async function fetchOwedData(): Promise<{ [key: string]: number } | null> {
+export async function fetchOwedData(store?: string): Promise<{ [key: string]: number } | null> {
   if (!EXPO_PUBLIC_APPS_SCRIPT_URL) {
     console.warn('Google Apps Script URL is not defined. Cannot fetch owed data.');
     return null;
   }
 
-  const url = `${EXPO_PUBLIC_APPS_SCRIPT_URL}?action=getOwedData`;
+  // Build URL with store parameter if provided
+  const url = new URL(EXPO_PUBLIC_APPS_SCRIPT_URL);
+  url.searchParams.set('action', 'getOwedData');
+  if (store) {
+    url.searchParams.set('store', store);
+  }
 
   try {
-    const response = await fetch(url, {
+    const response = await fetch(url.toString(), {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -115,7 +121,7 @@ export async function fetchOwedData(): Promise<{ [key: string]: number } | null>
     const payload = result.data || result;
 
     if (response.ok && payload.success && payload.owedData) {
-      console.log('Successfully fetched owed data.');
+      console.log(`Successfully fetched owed data for store: ${store || 'default'}`);
       return payload.owedData;
     } else {
       const errorMessage = payload.message || result.message || 'Unknown error fetching owed data';

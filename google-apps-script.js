@@ -24,7 +24,8 @@ const SUMMARY_SHEET_NAME = 'Safe';
 function doGet(e) {
   if (e && e.parameter && e.parameter.action === 'getOwedData') {
     try {
-      const owedData = getOwedData();
+      const store = e.parameter.store;
+      const owedData = getOwedData(store);
       return createSuccessResponse({ owedData: owedData });
     } catch (error) {
       return createErrorResponse(500, 'Internal Server Error', error);
@@ -144,13 +145,26 @@ function createErrorResponse(statusCode, message, error = {}) {
 }
 
 /**
- * Reads the "Owed" data from the "Safe" summary sheet.
+ * Reads the "Owed" data from the appropriate Safe summary sheet based on store.
+ * @param {string} store - The store name (e.g., "Newtown", "Paddington")
  */
-function getOwedData() {
+function getOwedData(store) {
   const spreadsheet = SpreadsheetApp.openById(SPREADSHEET_ID);
-  const summarySheet = spreadsheet.getSheetByName(SUMMARY_SHEET_NAME);
+  
+  // Determine the correct sheet name based on store
+  let sheetName;
+  if (store === 'Newtown') {
+    sheetName = 'Safe_Newtown';
+  } else if (store === 'Paddington') {
+    sheetName = 'Safe_Paddington';
+  } else {
+    // Default to the original Safe sheet for backward compatibility
+    sheetName = SUMMARY_SHEET_NAME;
+  }
+  
+  const summarySheet = spreadsheet.getSheetByName(sheetName);
   if (!summarySheet) {
-    throw new Error(`Summary sheet "${SUMMARY_SHEET_NAME}" not found`);
+    throw new Error(`Summary sheet "${sheetName}" not found`);
   }
 
   const lastColumn = summarySheet.getLastColumn();

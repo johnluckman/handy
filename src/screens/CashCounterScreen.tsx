@@ -51,7 +51,7 @@ export default function CashCounterScreen(): React.ReactElement {
     const newState = initializeState();
     setNotes('');
 
-    const owedData = await fetchOwedData();
+    const owedData = await fetchOwedData(store || undefined);
     if (owedData) {
       // Populate the new state object with the fetched data
       for (const id in owedData) {
@@ -62,7 +62,7 @@ export default function CashCounterScreen(): React.ReactElement {
     }
     setData(newState);
     setIsLoading(false);
-  }, []);
+  }, [store]);
 
   useEffect(() => {
     loadInitialData();
