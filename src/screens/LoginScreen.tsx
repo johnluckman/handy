@@ -6,6 +6,7 @@ import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import DropDownPicker from 'react-native-dropdown-picker';
 import { STORES, USERS } from '../config/auth';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import LoadingScreen from '../components/LoadingScreen';
 
 export default function LoginScreen() {
   const { login } = useAuth();
@@ -22,39 +23,58 @@ export default function LoginScreen() {
     USERS.map((u) => ({ label: u, value: u }))
   );
 
+  const [isLoading, setIsLoading] = useState(true);
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     const loadLastSelection = async () => {
-      const lastStore = await AsyncStorage.getItem('lastStore');
-      const lastUser = await AsyncStorage.getItem('lastUser');
-      if (lastStore) {
-        setStoreValue(lastStore);
-      } else {
+      try {
+        const lastStore = await AsyncStorage.getItem('lastStore');
+        const lastUser = await AsyncStorage.getItem('lastUser');
+        
+        if (lastStore) {
+          setStoreValue(lastStore);
+        } else {
+          setStoreValue(STORES[0]);
+        }
+        
+        if (lastUser) {
+          setUserValue(lastUser);
+        } else {
+          setUserValue(USERS[0]);
+        }
+      } catch (error) {
+        console.error('Error loading last selection:', error);
+        // Fallback to defaults
         setStoreValue(STORES[0]);
-      }
-      if (lastUser) {
-        setUserValue(lastUser);
-      } else {
         setUserValue(USERS[0]);
+      } finally {
+        setIsLoading(false);
       }
     };
+    
     loadLastSelection();
   }, []);
 
   useEffect(() => {
-    Animated.timing(fadeAnim, {
-      toValue: 1,
-      duration: 600,
-      useNativeDriver: true,
-    }).start();
-  }, []);
+    if (!isLoading) {
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 600,
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [isLoading, fadeAnim]);
 
   const handleLogin = async () => {
     if (storeValue && userValue) {
-      await AsyncStorage.setItem('lastStore', storeValue);
-      await AsyncStorage.setItem('lastUser', userValue);
-      login(userValue, storeValue);
+      try {
+        await AsyncStorage.setItem('lastStore', storeValue);
+        await AsyncStorage.setItem('lastUser', userValue);
+        await login(userValue, storeValue);
+      } catch (error) {
+        console.error('Error during login:', error);
+      }
     }
   };
 
@@ -66,9 +86,12 @@ export default function LoginScreen() {
     setStoreOpen(false);
   };
 
+  if (isLoading) {
+    return <LoadingScreen size={120} text="Loading..." />;
+  }
+
   if (!storeValue || !userValue) {
-    // Render a loading state or null while waiting for async storage
-    return null;
+    return <LoadingScreen size={120} text="Initializing..." />;
   }
 
   return (

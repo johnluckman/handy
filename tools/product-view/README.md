@@ -16,7 +16,6 @@ Product View is a mobile-first product catalog and inventory management tool tha
 - **Multi-field Search**: Search by product name, SKU, brand, category, or description
 - **Fuzzy Matching**: Handles typos and partial matches for better user experience
 - **Advanced Filters**: Filter by price range, stock status, location, brand, category
-- **Search History**: Track and display recent searches for quick access
 - **Autocomplete**: Smart suggestions as users type
 
 ### 3. Product Catalog Interface

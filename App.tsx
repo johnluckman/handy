@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { View } from 'react-native';
 import { useFonts } from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
@@ -17,14 +17,27 @@ function AppContent() {
     'Inter-Bold': require('./src/assets/fonts/Inter-Bold.ttf'),
   });
 
+  const [fontTimeout, setFontTimeout] = useState(false);
+
+  useEffect(() => {
+    // Add a timeout to prevent infinite loading
+    const timeout = setTimeout(() => {
+      console.warn('Font loading timeout - proceeding without fonts');
+      setFontTimeout(true);
+    }, 15000); // 15 second timeout
+
+    return () => clearTimeout(timeout);
+  }, []);
+
   const onLayoutRootView = useCallback(async () => {
-    if (fontsLoaded || fontError) {
+    if (fontsLoaded || fontError || fontTimeout) {
       await SplashScreen.hideAsync();
     }
-  }, [fontsLoaded, fontError]);
+  }, [fontsLoaded, fontError, fontTimeout]);
 
-  if (!fontsLoaded && !fontError) {
-    return <LoadingScreen size={120} />;
+  // Show loading screen while fonts are loading, but with timeout fallback
+  if (!fontsLoaded && !fontError && !fontTimeout) {
+    return <LoadingScreen size={120} text="Loading fonts..." />;
   }
 
   return (

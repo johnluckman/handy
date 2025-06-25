@@ -87,21 +87,28 @@ export default function CashCounterScreen(): React.ReactElement {
 
   const loadInitialData = useCallback(async () => {
     setIsLoading(true);
-    // Create a fresh state object, which also clears any user input
-    const newState = initializeState();
-    setNotes('');
+    try {
+      // Create a fresh state object, which also clears any user input
+      const newState = initializeState();
+      setNotes('');
 
-    const owedData = await fetchOwedData(store || undefined);
-    if (owedData) {
-      // Populate the new state object with the fetched data
-      for (const id in owedData) {
-        if (newState[id]) {
-          newState[id].owed = owedData[id];
+      const owedData = await fetchOwedData(store || undefined);
+      if (owedData) {
+        // Populate the new state object with the fetched data
+        for (const id in owedData) {
+          if (newState[id]) {
+            newState[id].owed = owedData[id];
+          }
         }
       }
+      setData(newState);
+    } catch (error) {
+      console.error('Error loading initial data:', error);
+      // Set default state even if network request fails
+      setData(initializeState());
+    } finally {
+      setIsLoading(false);
     }
-    setData(newState);
-    setIsLoading(false);
   }, [store]);
 
   useEffect(() => {
