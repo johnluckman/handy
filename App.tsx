@@ -1,3 +1,4 @@
+import 'react-native-gesture-handler';
 import React, { useCallback, useEffect, useState } from 'react';
 import { View } from 'react-native';
 import { useFonts } from 'expo-font';
@@ -7,6 +8,7 @@ import { AuthProvider } from './src/context/AuthContext';
 import { QueueProvider } from './src/context/QueueContext';
 import AppNavigator from './src/navigation/AppNavigator';
 import LoadingScreen from './src/components/LoadingScreen';
+import ErrorBoundary from './src/components/ErrorBoundary';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -49,10 +51,12 @@ function AppContent() {
 
 export default function App(): React.ReactElement {
   return (
-    <AuthProvider>
-      <QueueProvider>
-        <AppContent />
-      </QueueProvider>
-    </AuthProvider>
+    <ErrorBoundary>
+      <AuthProvider>
+        <QueueProvider>
+          <AppContent />
+        </QueueProvider>
+      </AuthProvider>
+    </ErrorBoundary>
   );
 }

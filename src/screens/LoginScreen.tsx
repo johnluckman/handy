@@ -29,20 +29,20 @@ export default function LoginScreen() {
   useEffect(() => {
     const loadLastSelection = async () => {
       try {
-        const lastStore = await AsyncStorage.getItem('lastStore');
-        const lastUser = await AsyncStorage.getItem('lastUser');
+      const lastStore = await AsyncStorage.getItem('lastStore');
+      const lastUser = await AsyncStorage.getItem('lastUser');
         
-        if (lastStore) {
-          setStoreValue(lastStore);
-        } else {
-          setStoreValue(STORES[0]);
-        }
+      if (lastStore) {
+        setStoreValue(lastStore);
+      } else {
+        setStoreValue(STORES[0]);
+      }
         
-        if (lastUser) {
-          setUserValue(lastUser);
-        } else {
-          setUserValue(USERS[0]);
-        }
+      if (lastUser) {
+        setUserValue(lastUser);
+      } else {
+        setUserValue(USERS[0]);
+      }
       } catch (error) {
         console.error('Error loading last selection:', error);
         // Fallback to defaults
@@ -58,19 +58,19 @@ export default function LoginScreen() {
 
   useEffect(() => {
     if (!isLoading) {
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 600,
-        useNativeDriver: true,
-      }).start();
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 600,
+      useNativeDriver: true,
+    }).start();
     }
   }, [isLoading, fadeAnim]);
 
   const handleLogin = async () => {
     if (storeValue && userValue) {
       try {
-        await AsyncStorage.setItem('lastStore', storeValue);
-        await AsyncStorage.setItem('lastUser', userValue);
+      await AsyncStorage.setItem('lastStore', storeValue);
+      await AsyncStorage.setItem('lastUser', userValue);
         await login(userValue, storeValue);
       } catch (error) {
         console.error('Error during login:', error);

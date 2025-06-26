@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator, StackNavigationProp } from '@react-navigation/stack';
 import { useAuth } from '../context/AuthContext';
@@ -45,14 +45,20 @@ function AuthStack() {
 export default function AppNavigator(): React.ReactElement {
   const { user, isLoading } = useAuth();
 
+  useEffect(() => {
+    console.log('AppNavigator - Auth state:', { user: !!user, isLoading });
+  }, [user, isLoading]);
+
   if (isLoading) {
+    console.log('AppNavigator - Showing loading screen');
     return (
       <View style={styles.loadingContainer}>
-        <LoadingScreen size={100} />
+        <LoadingScreen size={100} text="Loading..." />
       </View>
     );
   }
 
+  console.log('AppNavigator - Rendering navigation, user:', !!user);
   return (
     <NavigationContainer>
       {user ? <AppStack /> : <AuthStack />}

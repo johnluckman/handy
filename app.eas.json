@@ -30,7 +30,7 @@
       "favicon": "./src/assets/favicon.png",
       "bundler": "metro"
     },
-    "platforms": ["ios", "android", "web"],
+    "platforms": ["ios", "web"],
     "extra": {
       "eas": {
         "projectId": "cc5f4911-bb5a-4ba6-9318-ba23fa656eb8"

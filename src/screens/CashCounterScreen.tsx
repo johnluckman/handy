@@ -367,10 +367,16 @@ export default function CashCounterScreen(): React.ReactElement {
                 <Text style={styles.totalValue}>{`$${total.toFixed(2)}`}</Text>
               </View>
               <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>
-                  Float total: {totalActualFloat === idealFloat ? '✅' : '❌'}
+                <Text style={[
+                  styles.summaryLabel,
+                  Math.abs((totalActualFloat + totalBorrowed) - idealFloat) < 0.01 && styles.summaryLabelGreen
+                ]}>
+                  Float + Borrowed: {Math.abs((totalActualFloat + totalBorrowed) - idealFloat) < 0.01 ? '✅' : '❌'}
                 </Text>
-                <Text style={styles.summaryValue}>{`$${totalActualFloat.toFixed(2)} / $${idealFloat.toFixed(2)}`}</Text>
+                <Text style={[
+                  styles.summaryValue,
+                  Math.abs((totalActualFloat + totalBorrowed) - idealFloat) < 0.01 && styles.summaryValueGreen
+                ]}>{`$${(totalActualFloat + totalBorrowed).toFixed(2)}/$${idealFloat.toFixed(2)}`}</Text>
               </View>
               <View style={styles.summaryRow}>
                 <Text style={styles.summaryLabel}>Borrowed Total:</Text>
@@ -683,5 +689,11 @@ const styles = StyleSheet.create({
     color: '#888',
     fontFamily: 'Inter-SemiBold',
     marginLeft: 4,
+  },
+  summaryLabelGreen: {
+    color: '#39b878',
+  },
+  summaryValueGreen: {
+    color: '#39b878',
   },
 }); 
