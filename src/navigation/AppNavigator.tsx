@@ -6,7 +6,7 @@ import { View, StyleSheet } from 'react-native';
 import LoadingScreen from '../components/LoadingScreen';
 
 import DashboardScreen from '../screens/DashboardScreen';
-import CashCounterScreen from '../screens/CashCounterScreen';
+import CashCounterScreen from '../../tools/cash-counter/CashCounterScreenEntry';
 import LoginScreen from '../screens/LoginScreen';
 
 export type RootStackParamList = {

@@ -1,9 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { appendToSheet } from './googleSheets'; // Assuming this is your GS API
 
 const QUEUE_KEY = 'submissionQueue';
 
-// The queue will now store the whole submission object
+// Generic queue service that can be used by multiple tools
 export async function addToQueue(data: object): Promise<void> {
   try {
     const queue = await getQueue();
@@ -24,15 +23,17 @@ export async function getQueue(): Promise<object[]> {
   }
 }
 
-export async function processQueue(): Promise<{ success: boolean; message: string; batchSize: number }> {
+export async function processQueue(
+  processor: (queue: object[]) => Promise<{ success: boolean; message?: string }>
+): Promise<{ success: boolean; message: string; batchSize: number }> {
   const queue = await getQueue();
   if (queue.length === 0) {
     return { success: true, message: 'Queue is empty.', batchSize: 0 };
   }
 
   try {
-    // Pass the entire queue to be processed as a batch
-    const result = await appendToSheet(queue);
+    // Use the provided processor function to handle the queue
+    const result = await processor(queue);
     
     if (result.success) {
       // Clear the queue only on successful batch submission
@@ -55,7 +56,7 @@ export async function processQueue(): Promise<{ success: boolean; message: strin
  */
 export const updateQueue = async (queue: object[]): Promise<void> => {
     try {
-        await AsyncStorage.setItem('submissionQueue', JSON.stringify(queue));
+        await AsyncStorage.setItem(QUEUE_KEY, JSON.stringify(queue));
         console.log(`[QueueService] Queue updated. New size is ${queue.length}.`);
     } catch (error) {
         console.error('[QueueService] Failed to update queue:', error);

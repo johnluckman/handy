@@ -5,7 +5,7 @@ import { processQueue as processQueueService, getQueue } from '../services/queue
 
 interface QueueContextType {
   queue: object[];
-  processQueue: () => Promise<{ success: boolean; message: string; batchSize: number }>;
+  processQueue: (processor: (queue: object[]) => Promise<{ success: boolean; message?: string }>) => Promise<{ success: boolean; message: string; batchSize: number }>;
   refreshQueue: () => Promise<void>;
 }
 
@@ -30,7 +30,7 @@ export const QueueProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     refreshQueue();
   }, [refreshQueue]);
 
-  const processQueue = useCallback(async () => {
+  const processQueue = useCallback(async (processor: (queue: object[]) => Promise<{ success: boolean; message?: string }>) => {
     if (isProcessing.current) {
       return { success: false, message: 'Queue processing already in progress.', batchSize: 0 };
     }
@@ -41,7 +41,7 @@ export const QueueProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     }
 
     isProcessing.current = true;
-    const result = await processQueueService();
+    const result = await processQueueService(processor);
     if (result.success) {
       await refreshQueue();
     }
@@ -52,7 +52,7 @@ export const QueueProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   useEffect(() => {
     const unsubscribe = NetInfo.addEventListener(state => {
       if (state.isConnected) {
-        processQueue();
+        processQueue(() => Promise.resolve({ success: true }));
       }
     });
 

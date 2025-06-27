@@ -3,15 +3,14 @@ import { View, Text, StyleSheet, ScrollView, Button, Alert, TextInput, Platform,
 import NetInfo, { useNetInfo } from '@react-native-community/netinfo';
 import { LinearGradient } from 'expo-linear-gradient';
 import DenominationRow, { RowData } from '../components/DenominationRow';
-import { denominations, Denomination } from '../utils/denominations';
+import { denominations, Denomination } from '../../../../src/utils/denominations';
 import { appendToSheet, fetchOwedData } from '../services/googleSheets';
-import { addToQueue } from '../services/queueService';
-import { useQueue } from '../context/QueueContext'; // Corrected import path
-import { useNavigation } from '@react-navigation/native';
+import { addToQueue } from '../../../../src/services/queueService';
+import { useQueue } from '../../../../src/context/QueueContext';
+import { useAuth } from '../../../../src/context/AuthContext';
+import LoadingScreen from '../../../../src/components/LoadingScreen';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
-import { NavigationProps } from '../navigation/AppNavigator';
-import { useAuth } from '../context/AuthContext'; // Import useAuth
-import LoadingScreen from '../components/LoadingScreen';
+import { useNavigation } from '@react-navigation/native';
 
 // Defines the structure for our state, mapping each denomination ID to its RowData
 interface DenominationData {
@@ -39,22 +38,22 @@ const instructions = [
   {
     key: '1',
     text: 'Step 1: Count everything in the till and enter in "Count" column.',
-    image: require('../assets/instructions/cash-count-1.png'),
+    image: require('../../assets/instructions/cash-count-1.png'),
   },
   {
     key: '2',
     text: 'Step 2: Take out the recommended float for the till and enter in "Float" column.',
-    image: require('../assets/instructions/cash-count-2.png'),
+    image: require('../../assets/instructions/cash-count-2.png'),
   },
   {
     key: '3',
     text: 'Step 3: If you dont have enough for the float, you can borrow from the safe and enter in "Borrow" column.',
-    image: require('../assets/instructions/cash-count-3.png'),
+    image: require('../../assets/instructions/cash-count-3.png'),
   },
   {
     key: '4',
     text: 'Step 4: If the safe is "Owed" any notes/coins and you have a surplus, you can return the Owed amount to the safe and enter it in "Returned" column.',
-    image: require('../assets/instructions/cash-count-4.png'),
+    image: require('../../assets/instructions/cash-count-4.png'),
   },
 ];
 const { width } = Dimensions.get('window');
@@ -67,7 +66,7 @@ const modalSlideWidth = width * 0.9 - 40;
  */
 export default function CashCounterScreen(): React.ReactElement {
   const { user: userName, store } = useAuth();
-  const navigation = useNavigation<NavigationProps>();
+  const navigation = useNavigation();
   const netInfo = useNetInfo();
   const [data, setData] = useState<DenominationData>(initializeState());
   const [notes, setNotes] = useState('');
@@ -204,7 +203,9 @@ export default function CashCounterScreen(): React.ReactElement {
       await addToQueue(submissionData);
       
       // 2. Trigger the sync and get the result
-      const result = await queueContext.processQueue();
+      const result = await queueContext.processQueue(async (queue) => {
+        return await appendToSheet(queue);
+      });
       
       // 3. Handle the result
       if (result.success) {
@@ -307,7 +308,7 @@ export default function CashCounterScreen(): React.ReactElement {
           <View style={styles.headerLeft}>
             <TouchableOpacity 
               style={styles.backButton}
-              onPress={() => navigation.navigate('Dashboard')}
+              onPress={() => {/* navigation.navigate('Dashboard') removed for modular tool */}}
             >
               <Icon name="arrow-left" size={24} color="#ffffff" />
             </TouchableOpacity>

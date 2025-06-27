@@ -18,7 +18,7 @@ export interface RowData {
 }
 
 export default function DenominationRow({ denomination, rowData, onRowDataChange }: DenominationRowProps): React.ReactElement {
-  const { id, value, imageUrl } = denomination;
+  const { id, value, image } = denomination;
   const [borrowFieldTouched, setBorrowFieldTouched] = useState(false);
   const [floatFieldTouched, setFloatFieldTouched] = useState(false);
   const [countFieldTouched, setCountFieldTouched] = useState(false);
@@ -179,7 +179,7 @@ export default function DenominationRow({ denomination, rowData, onRowDataChange
     <View style={styles.container}>
       {/* Denomination Info */}
       <View style={styles.denominationInfo}>
-        <Image source={imageUrl} style={styles.image} />
+        <Image source={image} style={styles.image} />
         <Text style={styles.denominationLabel}>{`$${value.toFixed(2)}`}</Text>
       </View>
 
