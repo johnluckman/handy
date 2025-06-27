@@ -1,91 +1,100 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
   View,
   TextInput,
   TouchableOpacity,
   StyleSheet,
-  Keyboard,
+  TextInputProps,
 } from 'react-native';
-import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import Icon from 'react-native-vector-icons/MaterialIcons';
 
-interface SearchBarProps {
-  value: string;
-  onChangeText: (text: string) => void;
-  onSubmit?: () => void;
-  placeholder?: string;
-  autoFocus?: boolean;
+interface SearchBarProps extends TextInputProps {
+  onPress?: () => void;
+  onSearch?: (query: string) => void;
+  colors?: {
+    card: string;
+    border: string;
+    text: string;
+    textSecondary: string;
+  };
 }
 
-export default function SearchBar({
-  value,
-  onChangeText,
-  onSubmit,
+const SearchBar: React.FC<SearchBarProps> = ({
   placeholder = 'Search...',
-  autoFocus = false,
-}: SearchBarProps) {
-  const [isFocused, setIsFocused] = useState(false);
+  onPress,
+  onSearch,
+  editable = true,
+  colors = {
+    card: '#FFFFFF',
+    border: '#E5E5EA',
+    text: '#000000',
+    textSecondary: '#8E8E93',
+  },
+  ...props
+}) => {
+  const styles = StyleSheet.create({
+    container: {
+      backgroundColor: colors.card,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: colors.border,
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      minHeight: 48,
+    },
+    input: {
+      flex: 1,
+      fontSize: 16,
+      color: colors.text,
+      marginLeft: 12,
+    },
+    icon: {
+      color: colors.textSecondary,
+    },
+  });
 
-  const handleSubmit = () => {
-    Keyboard.dismiss();
-    onSubmit?.();
+  const handlePress = () => {
+    if (onPress) {
+      onPress();
+    }
   };
 
-  const handleClear = () => {
-    onChangeText('');
+  const handleSubmit = (text: string) => {
+    if (onSearch) {
+      onSearch(text);
+    }
   };
+
+  if (!editable && onPress) {
+    return (
+      <TouchableOpacity style={styles.container} onPress={handlePress}>
+        <Icon name="search" size={20} style={styles.icon} />
+        <TextInput
+          style={styles.input}
+          placeholder={placeholder}
+          placeholderTextColor={colors.textSecondary}
+          editable={false}
+          pointerEvents="none"
+        />
+      </TouchableOpacity>
+    );
+  }
 
   return (
-    <View style={[styles.container, isFocused && styles.containerFocused]}>
-      <Icon name="magnify" size={20} color="#666" style={styles.searchIcon} />
+    <View style={styles.container}>
+      <Icon name="search" size={20} style={styles.icon} />
       <TextInput
         style={styles.input}
-        value={value}
-        onChangeText={onChangeText}
-        onSubmitEditing={handleSubmit}
         placeholder={placeholder}
-        placeholderTextColor="#999"
-        autoFocus={autoFocus}
-        onFocus={() => setIsFocused(true)}
-        onBlur={() => setIsFocused(false)}
+        placeholderTextColor={colors.textSecondary}
+        onSubmitEditing={(e) => handleSubmit(e.nativeEvent.text)}
         returnKeyType="search"
-        autoCapitalize="none"
-        autoCorrect={false}
+        {...props}
       />
-      {value.length > 0 && (
-        <TouchableOpacity onPress={handleClear} style={styles.clearButton}>
-          <Icon name="close-circle" size={20} color="#999" />
-        </TouchableOpacity>
-      )}
     </View>
   );
-}
+};
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#f5f5f5',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    height: 44,
-  },
-  containerFocused: {
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: '#007AFF',
-  },
-  searchIcon: {
-    marginRight: 8,
-  },
-  input: {
-    flex: 1,
-    fontSize: 16,
-    color: '#333',
-    paddingVertical: 8,
-  },
-  clearButton: {
-    marginLeft: 8,
-    padding: 4,
-  },
-}); 
+export default SearchBar; 
