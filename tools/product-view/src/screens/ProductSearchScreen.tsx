@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -12,11 +12,11 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 
-import { useTheme } from '../context/ThemeContext';
+import { useTheme } from '../../../../src/context/ThemeContext';
 import { useProduct } from '../context/ProductContext';
 import { RootStackParamList } from '../App';
-import SearchBar from '../components/SearchBar';
 import ProductCard from '../components/ProductCard';
+import SearchBar from '../../../../src/components/SearchBar';
 
 type ProductSearchScreenNavigationProp = StackNavigationProp<RootStackParamList, 'ProductSearch'>;
 type ProductSearchScreenRouteProp = RouteProp<RootStackParamList, 'ProductSearch'>;

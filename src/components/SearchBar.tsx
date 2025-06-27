@@ -7,11 +7,16 @@ import {
   TextInputProps,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
-import { useTheme } from '../context/ThemeContext';
 
 interface SearchBarProps extends TextInputProps {
   onPress?: () => void;
   onSearch?: (query: string) => void;
+  colors?: {
+    card: string;
+    border: string;
+    text: string;
+    textSecondary: string;
+  };
 }
 
 const SearchBar: React.FC<SearchBarProps> = ({
@@ -19,10 +24,14 @@ const SearchBar: React.FC<SearchBarProps> = ({
   onPress,
   onSearch,
   editable = true,
+  colors = {
+    card: '#FFFFFF',
+    border: '#E5E5EA',
+    text: '#000000',
+    textSecondary: '#8E8E93',
+  },
   ...props
 }) => {
-  const { colors } = useTheme();
-
   const styles = StyleSheet.create({
     container: {
       backgroundColor: colors.card,

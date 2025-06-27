@@ -8,10 +8,12 @@ import LoadingScreen from '../components/LoadingScreen';
 import DashboardScreen from '../screens/DashboardScreen';
 import CashCounterScreen from '../../tools/cash-counter/CashCounterScreenEntry';
 import LoginScreen from '../screens/LoginScreen';
+import ProductViewScreen from '../../tools/product-view/ProductViewEntry';
 
 export type RootStackParamList = {
   Dashboard: undefined;
   CashCounter: undefined;
+  ProductView: undefined;
   Login: undefined;
 };
 
@@ -30,6 +32,7 @@ function AppStack() {
     >
       <Stack.Screen name="Dashboard" component={DashboardScreen} />
       <Stack.Screen name="CashCounter" component={CashCounterScreen} />
+      <Stack.Screen name="ProductView" component={ProductViewScreen} />
     </Stack.Navigator>
   );
 }

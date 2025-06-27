@@ -6,15 +6,15 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 // Screens
-import HomeScreen from './screens/HomeScreen';
 import ProductSearchScreen from './screens/ProductSearchScreen';
 import ProductDetailScreen from './screens/ProductDetailScreen';
 import BarcodeScannerScreen from './screens/BarcodeScannerScreen';
 import SettingsScreen from './screens/SettingsScreen';
+import ProductViewScreen from './screens/ProductViewScreen';
 
 // Context
 import { ProductProvider } from './context/ProductContext';
-import { ThemeProvider } from './context/ThemeContext';
+import { ThemeProvider } from '../../../../src/context/ThemeContext';
 
 // Types
 export type RootStackParamList = {
@@ -23,6 +23,7 @@ export type RootStackParamList = {
   ProductDetail: { productId: string };
   BarcodeScanner: undefined;
   Settings: undefined;
+  ProductView: undefined;
 };
 
 const Stack = createStackNavigator<RootStackParamList>();
@@ -49,7 +50,7 @@ export default function App() {
               >
                 <Stack.Screen
                   name="Home"
-                  component={HomeScreen}
+                  component={ProductViewScreen}
                   options={{
                     title: 'Product View',
                     headerShown: false,
@@ -84,6 +85,14 @@ export default function App() {
                   component={SettingsScreen}
                   options={{
                     title: 'Settings',
+                    headerBackTitle: 'Back',
+                  }}
+                />
+                <Stack.Screen
+                  name="ProductView"
+                  component={ProductViewScreen}
+                  options={{
+                    title: 'Product View',
                     headerBackTitle: 'Back',
                   }}
                 />

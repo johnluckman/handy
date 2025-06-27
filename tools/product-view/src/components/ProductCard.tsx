@@ -7,7 +7,7 @@ import {
   Image,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
-import { useTheme } from '../context/ThemeContext';
+import { useTheme } from '../../../../src/context/ThemeContext';
 import { DatabaseProduct } from '../services/cin7Types';
 
 interface ProductCardProps {

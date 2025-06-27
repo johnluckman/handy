@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -7,34 +7,38 @@ import {
   TouchableOpacity,
   Image,
   RefreshControl,
+  FlatList,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialIcons';
+import { fetchProducts } from '../../../../src/services/supabase'; // Adjust path as needed
 
-import { useTheme } from '../context/ThemeContext';
+import { useTheme } from '../../../../src/context/ThemeContext';
 import { useProduct } from '../context/ProductContext';
 import { RootStackParamList } from '../App';
 import ProductCard from '../components/ProductCard';
-import SearchBar from '../components/SearchBar';
+import SearchBar from '../../../../src/components/SearchBar';
 
 type HomeScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Home'>;
 
-const HomeScreen: React.FC = () => {
+const ProductViewScreen: React.FC = () => {
   const navigation = useNavigation<HomeScreenNavigationProp>();
   const { colors } = useTheme();
   const {
     recentProducts,
     popularProducts,
     lowStockProducts,
-    loading,
+    loading: productLoading,
     loadRecentProducts,
     loadPopularProducts,
     loadLowStockProducts,
   } = useProduct();
 
   const [refreshing, setRefreshing] = React.useState(false);
+  const [products, setProducts] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
   const onRefresh = React.useCallback(async () => {
     setRefreshing(true);
@@ -57,6 +61,13 @@ const HomeScreen: React.FC = () => {
   const handleProductPress = (productId: string) => {
     navigation.navigate('ProductDetail', { productId });
   };
+
+  useEffect(() => {
+    fetchProducts()
+      .then(setProducts)
+      .catch((err) => alert('Error fetching products: ' + err.message))
+      .finally(() => setLoading(false));
+  }, []);
 
   const styles = StyleSheet.create({
     container: {
@@ -148,6 +159,8 @@ const HomeScreen: React.FC = () => {
     },
   });
 
+  if (loading) return <Text>Loading...</Text>;
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView
@@ -168,6 +181,12 @@ const HomeScreen: React.FC = () => {
             placeholder="Search products..."
             onPress={handleSearchPress}
             editable={false}
+            colors={{
+              card: colors.card,
+              border: colors.border,
+              text: colors.text,
+              textSecondary: colors.textSecondary,
+            }}
           />
           
           <View style={styles.quickActions}>
@@ -199,7 +218,7 @@ const HomeScreen: React.FC = () => {
           </View>
           
           <View style={styles.productList}>
-            {loading.recent ? (
+            {productLoading.recent ? (
               <View style={styles.loadingContainer}>
                 <Text style={styles.emptyStateText}>Loading...</Text>
               </View>
@@ -232,7 +251,7 @@ const HomeScreen: React.FC = () => {
           </View>
           
           <View style={styles.productList}>
-            {loading.popular ? (
+            {productLoading.popular ? (
               <View style={styles.loadingContainer}>
                 <Text style={styles.emptyStateText}>Loading...</Text>
               </View>
@@ -265,7 +284,7 @@ const HomeScreen: React.FC = () => {
           </View>
           
           <View style={styles.productList}>
-            {loading.lowStock ? (
+            {productLoading.lowStock ? (
               <View style={styles.loadingContainer}>
                 <Text style={styles.emptyStateText}>Loading...</Text>
               </View>
@@ -292,4 +311,4 @@ const HomeScreen: React.FC = () => {
   );
 };
 
-export default HomeScreen; 
+export default ProductViewScreen; 

@@ -7,10 +7,11 @@ import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 const tools = [
   { id: '1', name: 'Cash Counter' },
-  { id: '2', name: 'Restocker' },
-  { id: '3', name: 'Stocktaker' },
-  { id: '4', name: 'Training Quiz' },
-  { id: '5', name: 'Brand Info' },
+  { id: '2', name: 'Product View' },
+  { id: '3', name: 'Restocker' },
+  { id: '4', name: 'Stocktaker' },
+  { id: '5', name: 'Training Quiz' },
+  { id: '6', name: 'Brand Info' },
 ];
 
 /**
@@ -23,6 +24,9 @@ export default function DashboardScreen(): React.ReactElement {
   const handlePress = (toolName: string) => {
     if (toolName === 'Cash Counter') {
       navigation.navigate('CashCounter');
+    }
+    if (toolName === 'Product View') {
+      navigation.navigate('ProductView');
     }
     // Add navigation for other tools here
   };

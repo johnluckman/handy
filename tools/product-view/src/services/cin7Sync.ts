@@ -13,6 +13,8 @@ import {
   Cin7Branch,
   Cin7Contact
 } from './cin7Types';
+import { fetchCin7Products } from './cin7Api';
+import { supabase } from '../../../../src/services/supabase'; // Adjust path as needed
 
 // Mock Supabase client for now - will be replaced with actual import when dependencies are installed
 interface SupabaseClient {
@@ -605,4 +607,13 @@ export class Cin7SyncService {
  */
 export function createCin7SyncService(config: SyncConfig): Cin7SyncService {
   return new Cin7SyncService(config);
+}
+
+export async function syncCin7ToSupabase() {
+  const products = await fetchCin7Products();
+  for (const product of products) {
+    await supabase.from('products').upsert(product, { onConflict: ['cin7_id'] });
+  }
+  // Repeat for variants, stock, etc.
+  return true;
 } 

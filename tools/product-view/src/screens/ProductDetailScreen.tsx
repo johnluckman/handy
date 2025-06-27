@@ -7,13 +7,14 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Alert,
+  Share,
 } from 'react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 
-import { useTheme } from '../context/ThemeContext';
+import { useTheme } from '../../../../src/context/ThemeContext';
 import { useProduct } from '../context/ProductContext';
 import { RootStackParamList } from '../App';
 import { DatabaseProduct, DatabaseProductVariant, DatabaseStockLevel } from '../services/cin7Types';

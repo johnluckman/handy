@@ -1,0 +1,19 @@
+declare module '@env' {
+  export const CIN7_API_URL: string;
+  export const CIN7_USERNAME: string;
+  export const CIN7_API_KEY: string;
+  export const SUPABASE_URL: string;
+  export const SUPABASE_ANON_KEY: string;
+  export const SUPABASE_SERVICE_ROLE_KEY: string;
+  export const SUPPLIER_DB_URL: string;
+  export const SUPPLIER_DB_KEY: string;
+  export const SYNC_INTERVAL_HOURS: string;
+  export const BATCH_SIZE: string;
+  export const MAX_RETRIES: string;
+  export const RATE_LIMIT_DELAY_MS: string;
+  export const IMAGE_QUALITY: string;
+  export const MAX_IMAGE_SIZE: string;
+  export const CACHE_SIZE_MB: string;
+  export const NODE_ENV: string;
+  export const DEBUG: string;
+} 
