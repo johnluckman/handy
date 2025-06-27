@@ -167,7 +167,10 @@ export default function CashCounterScreen(): React.ReactElement {
 
   const handleSubmit = async () => {
     setIsLoading(true);
-    const date = new Date().toISOString();
+    // Format date as yyyy-MM-dd HH:mm:ss (local time)
+    const now = new Date();
+    const pad = (n: number) => n.toString().padStart(2, '0');
+    const date = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
 
     const flatData = denominations.flatMap(d => {
       const row = data[d.id];
@@ -188,7 +191,7 @@ export default function CashCounterScreen(): React.ReactElement {
     }, {} as { [id: string]: { count: number; float: number; borrow: number; returned: number } });
 
     const submissionData = {
-      date: new Date().toISOString(),
+      date: date,
       user: userName,
       store: store,
       notes: notes,
