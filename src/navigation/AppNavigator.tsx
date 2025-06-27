@@ -8,11 +8,17 @@ import LoadingScreen from '../components/LoadingScreen';
 import DashboardScreen from '../screens/DashboardScreen';
 import CashCounterScreen from '../screens/CashCounterScreen';
 import LoginScreen from '../screens/LoginScreen';
+import ProductSearchScreen from '../screens/ProductSearchScreen';
+import ProductDetailScreen from '../screens/ProductDetailScreen';
+import BarcodeScannerScreen from '../screens/BarcodeScannerScreen';
 
 export type RootStackParamList = {
   Dashboard: undefined;
   CashCounter: undefined;
   Login: undefined;
+  ProductSearch: { initialQuery?: string };
+  ProductDetail: { productId: string };
+  BarcodeScanner: undefined;
 };
 
 export type NavigationProps = StackNavigationProp<RootStackParamList>;
@@ -30,6 +36,9 @@ function AppStack() {
     >
       <Stack.Screen name="Dashboard" component={DashboardScreen} />
       <Stack.Screen name="CashCounter" component={CashCounterScreen} />
+      <Stack.Screen name="ProductSearch" component={ProductSearchScreen} />
+      <Stack.Screen name="ProductDetail" component={ProductDetailScreen} />
+      <Stack.Screen name="BarcodeScanner" component={BarcodeScannerScreen} />
     </Stack.Navigator>
   );
 }

@@ -6,11 +6,12 @@ import { useAuth } from '../context/AuthContext';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 const tools = [
-  { id: '1', name: 'Cash Counter' },
-  { id: '2', name: 'Restocker' },
-  { id: '3', name: 'Stocktaker' },
-  { id: '4', name: 'Training Quiz' },
-  { id: '5', name: 'Brand Info' },
+  { id: '1', name: 'Cash Counter', icon: 'cash-register' },
+  { id: '2', name: 'Product Search', icon: 'magnify' },
+  { id: '3', name: 'Restocker', icon: 'package-variant' },
+  { id: '4', name: 'Stocktaker', icon: 'clipboard-list' },
+  { id: '5', name: 'Training Quiz', icon: 'school' },
+  { id: '6', name: 'Brand Info', icon: 'information' },
 ];
 
 /**
@@ -23,12 +24,15 @@ export default function DashboardScreen(): React.ReactElement {
   const handlePress = (toolName: string) => {
     if (toolName === 'Cash Counter') {
       navigation.navigate('CashCounter');
+    } else if (toolName === 'Product Search') {
+      navigation.navigate('ProductSearch', {});
     }
     // Add navigation for other tools here
   };
 
-  const renderTool = ({ item }: { item: { id: string; name: string } }) => (
+  const renderTool = ({ item }: { item: { id: string; name: string; icon: string } }) => (
     <TouchableOpacity style={styles.toolButton} onPress={() => handlePress(item.name)}>
+      <Icon name={item.icon} size={32} color="#007AFF" style={styles.toolIcon} />
       <Text style={styles.toolText}>{item.name}</Text>
     </TouchableOpacity>
   );
@@ -111,6 +115,9 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 5,
+  },
+  toolIcon: {
+    marginBottom: 8,
   },
   toolText: {
     fontSize: 16,
