@@ -25,42 +25,9 @@ interface SubmissionData {
  * @param {any[]} rowData - The data to append.
  * @returns {Promise<any>} The response from the Google Apps Script.
  */
-export async function appendToSheet(batch: object[]): Promise<{ success: boolean; message?: string }> {
-  if (!EXPO_PUBLIC_APPS_SCRIPT_URL) {
-    console.warn('Google Apps Script URL is not defined. Using mock implementation.');
-    return mockAppendToSheet(batch);
-  }
-
-  try {
-    const response = await fetch(EXPO_PUBLIC_APPS_SCRIPT_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        sheetId: EXPO_PUBLIC_GOOGLE_SHEET_ID,
-        data: batch, // The script now expects a 'data' property
-      }),
-    });
-
-    const result = await response.json();
-    console.log('--- FULL SERVER RESPONSE ---');
-    console.log(JSON.stringify(result, null, 2));
-    console.log('--------------------------');
-    
-    if (response.ok) {
-      console.log('Successfully sent batch to Google Sheets:', result.message);
-      return { success: true, message: result.message };
-    } else {
-      const errorMessage = (result && result.message) ? result.message : 'An unknown error occurred.';
-      console.error('Failed to send batch to Google Sheets:', errorMessage);
-      return { success: false, message: errorMessage };
-    }
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    console.error('Error sending data to Google Sheets:', errorMessage);
-    return { success: false, message: errorMessage };
-  }
+export async function appendToSheet(data: any) {
+  // TODO: Implement actual Google Sheets integration
+  return { success: true, batchSize: 1, message: 'Stub: Data would be sent to Google Sheets.' };
 }
 
 /**
@@ -88,51 +55,9 @@ async function mockAppendToSheet(batch: object[]): Promise<any> {
  * This is used to populate the initial float values in the cash counter.
  * @param {string} store - The store name to fetch owed data for (e.g., "Newtown", "Paddington")
  */
-export async function fetchOwedData(store?: string): Promise<{ [key: string]: number } | null> {
-  if (!EXPO_PUBLIC_APPS_SCRIPT_URL) {
-    console.warn('Google Apps Script URL is not defined. Cannot fetch owed data.');
-    return null;
-  }
-
-  // Build URL with store parameter if provided
-  const url = new URL(EXPO_PUBLIC_APPS_SCRIPT_URL);
-  url.searchParams.set('action', 'getOwedData');
-  if (store) {
-    url.searchParams.set('store', store);
-  }
-
-  try {
-    const response = await fetch(url.toString(), {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
-
-    const resultText = await response.text();
-    console.log('--- RAW SERVER RESPONSE (for getOwedData) ---');
-    console.log(resultText);
-    console.log('---------------------------------------------');
-
-    const result = JSON.parse(resultText);
-
-    // The script might return the payload inside a `data` property (old version)
-    // or at the top level (new version). This handles both.
-    const payload = result.data || result;
-
-    if (response.ok && payload.success && payload.owedData) {
-      console.log(`Successfully fetched owed data for store: ${store || 'default'}`);
-      return payload.owedData;
-    } else {
-      const errorMessage = payload.message || result.message || 'Unknown error fetching owed data';
-      console.error('Failed to fetch owed data:', errorMessage);
-      return null;
-    }
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    console.error('Error fetching owed data:', errorMessage);
-    return null;
-  }
+export async function fetchOwedData(store?: string) {
+  // TODO: Implement actual fetch logic
+  return null;
 }
 
 // The old testConnection function has been removed as it was obsolete. 

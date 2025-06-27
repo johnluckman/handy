@@ -96,13 +96,13 @@ export default function CashCounterScreen(): React.ReactElement {
       setNotes('');
 
       const owedData = await fetchOwedData(store || undefined);
-      if (owedData) {
+      if (owedData && typeof owedData === 'object') {
         // Populate the new state object with the fetched data
-        for (const id in owedData) {
+        Object.entries(owedData as Record<string, number>).forEach(([id, value]) => {
           if (newState[id]) {
-            newState[id].owed = owedData[id];
+            newState[id].owed = value;
           }
-        }
+        });
       }
       setData(newState);
     } catch (error) {

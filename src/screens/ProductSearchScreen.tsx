@@ -88,7 +88,7 @@ export default function ProductSearchScreen() {
         <SearchBar
           value={searchQuery}
           onChangeText={setSearchQuery}
-          onSubmit={() => handleSearch(searchQuery)}
+          onSubmitEditing={() => handleSearch(searchQuery)}
           placeholder="Search products..."
         />
         <TouchableOpacity style={styles.scanButton} onPress={handleBarcodeScan}>
