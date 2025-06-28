@@ -16,16 +16,22 @@ import SearchBar from '../components/SearchBar';
 import ProductCard from '../components/ProductCard';
 import { Product } from '../types/Product';
 import { RootStackParamList } from '../navigation/AppNavigator';
+import { LinearGradient } from 'expo-linear-gradient';
+import { checkCin7Api } from '../services/cin7Api';
 
 type ProductSearchScreenNavigationProp = StackNavigationProp<RootStackParamList, 'ProductSearch'>;
 type ProductSearchScreenRouteProp = RouteProp<RootStackParamList, 'ProductSearch'>;
 
 export default function ProductSearchScreen() {
+  console.log('ProductSearchScreen rendered');
   const navigation = useNavigation<ProductSearchScreenNavigationProp>();
   const route = useRoute<ProductSearchScreenRouteProp>();
   const { searchProducts, products, loading, error } = useProduct();
   const [searchQuery, setSearchQuery] = useState(route.params?.initialQuery || '');
   const [searchHistory, setSearchHistory] = useState<string[]>([]);
+
+  // Sync handler: call API endpoint to sync Cin7 to Supabase, then reload products
+  const [syncing, setSyncing] = useState(false);
 
   useEffect(() => {
     if (route.params?.initialQuery) {
@@ -34,11 +40,9 @@ export default function ProductSearchScreen() {
   }, [route.params?.initialQuery]);
 
   const handleSearch = async (query: string) => {
-    if (!query.trim()) return;
-    
+    console.log('Fetch button pressed, query:', query);
     setSearchQuery(query);
     await searchProducts(query);
-    
     // Add to search history
     if (!searchHistory.includes(query)) {
       setSearchHistory(prev => [query, ...prev.slice(0, 9)]);
@@ -46,11 +50,27 @@ export default function ProductSearchScreen() {
   };
 
   const handleProductPress = (product: Product) => {
-    navigation.navigate('ProductDetail', { productId: product.id });
+    navigation.navigate('ProductDetail', { product });
   };
 
   const handleBarcodeScan = () => {
     navigation.navigate('BarcodeScanner');
+  };
+
+  // Sync handler: call API endpoint to sync Cin7 to Supabase, then reload products
+  const handleSyncCin7 = async () => {
+    setSyncing(true);
+    try {
+      // Placeholder: call your backend API to trigger the sync script
+      await fetch('/api/syncCin7', { method: 'POST' });
+      // After sync, reload products from Supabase (or trigger your normal fetch)
+      await handleSearch(searchQuery);
+      Alert.alert('Sync Complete', 'Cin7 data has been synced to Supabase.');
+    } catch (err) {
+      Alert.alert('Sync Failed', err.message || 'Failed to sync Cin7 data.');
+    } finally {
+      setSyncing(false);
+    }
   };
 
   const renderProduct = ({ item }: { item: Product }) => (
@@ -82,19 +102,38 @@ export default function ProductSearchScreen() {
     </View>
   );
 
+  // Add this log before rendering the FlatList
+  console.log('ProductSearchScreen products:', products);
+
+  console.log('useProduct hook:', { searchProducts, products, loading, error });
+
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <SearchBar
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-          onSubmitEditing={() => handleSearch(searchQuery)}
-          placeholder="Search products..."
-        />
-        <TouchableOpacity style={styles.scanButton} onPress={handleBarcodeScan}>
-          <Icon name="barcode-scan" size={24} color="#fff" />
-        </TouchableOpacity>
-      </View>
+      <LinearGradient
+        colors={['#39b878', '#2E9A65']}
+        style={styles.headerGradient}
+      >
+        <View style={styles.headerContent}>
+          <Text style={styles.headerTitle}>Product Search</Text>
+          <View style={styles.headerActions}>
+            <SearchBar
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              onSubmitEditing={() => handleSearch(searchQuery)}
+              placeholder="Search products..."
+            />
+            <TouchableOpacity style={styles.scanButton} onPress={handleBarcodeScan}>
+              <Icon name="barcode-scan" size={24} color="#fff" />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.fetchButton} onPress={handleSyncCin7} disabled={syncing}>
+              <Icon name="download" size={24} color="#fff" />
+            </TouchableOpacity>
+            {syncing && (
+              <ActivityIndicator size="small" color="#fff" style={{ marginLeft: 8 }} />
+            )}
+          </View>
+        </View>
+      </LinearGradient>
 
       {error && (
         <View style={styles.errorContainer}>
@@ -133,19 +172,38 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f5f5f5',
   },
-  header: {
+  headerGradient: {
+    paddingTop: 50,
+    paddingBottom: 24,
+    paddingHorizontal: 16,
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
+  },
+  headerContent: {
+    width: '100%',
+  },
+  headerTitle: {
+    color: '#fff',
+    fontSize: 24,
+    fontFamily: 'Inter-Bold',
+    marginBottom: 12,
+    textAlign: 'left',
+  },
+  headerActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
   },
   scanButton: {
     backgroundColor: '#007AFF',
     padding: 12,
     borderRadius: 8,
     marginLeft: 12,
+  },
+  fetchButton: {
+    backgroundColor: '#4CAF50',
+    padding: 12,
+    borderRadius: 8,
+    marginLeft: 8,
   },
   errorContainer: {
     backgroundColor: '#ffebee',

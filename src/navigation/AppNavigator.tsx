@@ -11,13 +11,14 @@ import LoginScreen from '../screens/LoginScreen';
 import ProductSearchScreen from '../screens/ProductSearchScreen';
 import ProductDetailScreen from '../screens/ProductDetailScreen';
 import BarcodeScannerScreen from '../screens/BarcodeScannerScreen';
+import { Product } from '../types/Product';
 
 export type RootStackParamList = {
   Dashboard: undefined;
   CashCounter: undefined;
   Login: undefined;
   ProductSearch: { initialQuery?: string };
-  ProductDetail: { productId: string };
+  ProductDetail: { product: Product };
   BarcodeScanner: undefined;
 };
 

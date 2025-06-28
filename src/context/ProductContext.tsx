@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useCallback } from 'react';
 import { Product, ProductSearchParams } from '../types/Product';
-import { searchProducts as searchProductsService } from '../services/cin7Api';
+import { fetchProducts as fetchProductsService } from '../services/cin7Api';
 
 interface ProductContextType {
   products: Product[];
@@ -19,20 +19,15 @@ export function ProductProvider({ children }: { children: React.ReactNode }) {
   const [error, setError] = useState<string | null>(null);
 
   const searchProducts = useCallback(async (query: string) => {
-    if (!query.trim()) {
-      setProducts([]);
-      return;
-    }
-
+    console.log('ProductContext searchProducts called with:', query);
     setLoading(true);
     setError(null);
-
     try {
       const searchParams: ProductSearchParams = {
         query: query.trim(),
+        limit: 100,
       };
-
-      const response = await searchProductsService(searchParams);
+      const response = await fetchProductsService(searchParams);
       setProducts(response.products);
     } catch (err) {
       console.error('Error searching products:', err);

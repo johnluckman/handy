@@ -12,11 +12,11 @@ import {
 import { useRoute, useNavigation, RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
-import { getProductById } from '../services/cin7Api';
 import { Product } from '../types/Product';
+import { fetchStockByBarcode, StockUnit, fetchProductById, fetchStockByProductId } from '../services/cin7Api';
 
 type RootStackParamList = {
-  ProductDetail: { productId: string };
+  ProductDetail: { product: Product };
 };
 
 type ProductDetailScreenNavigationProp = StackNavigationProp<RootStackParamList, 'ProductDetail'>;
@@ -25,27 +25,55 @@ type ProductDetailScreenRouteProp = RouteProp<RootStackParamList, 'ProductDetail
 export default function ProductDetailScreen() {
   const navigation = useNavigation<ProductDetailScreenNavigationProp>();
   const route = useRoute<ProductDetailScreenRouteProp>();
-  const [product, setProduct] = useState<Product | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const product = route.params.product;
+  const [stock, setStock] = useState<StockUnit[] | null>(null);
+  const [stockLoading, setStockLoading] = useState(false);
+  const [stockError, setStockError] = useState<string | null>(null);
+  const [fullProduct, setFullProduct] = useState<any>(null);
+  const [fullProductLoading, setFullProductLoading] = useState(false);
+  const [fullProductError, setFullProductError] = useState<string | null>(null);
 
   useEffect(() => {
-    loadProduct();
-  }, [route.params.productId]);
+    const fetchStock = async () => {
+      if (!product.id) {
+        setStockError('No product ID available for this product.');
+        return;
+      }
+      setStockLoading(true);
+      setStockError(null);
+      try {
+        console.log('Fetching stock for productId:', product.id);
+        const stockData = await fetchStockByProductId(Number(product.id));
+        console.log('Stock by productId:', stockData);
+        if (stockData) {
+          console.log('Branch names:', stockData.map(s => s.branchName));
+        }
+        setStock(stockData);
+      } catch (err) {
+        console.error('Error fetching stock:', err);
+        setStockError(err.message || 'Failed to fetch stock');
+      } finally {
+        setStockLoading(false);
+      }
+    };
+    fetchStock();
+  }, [product.id]);
 
-  const loadProduct = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const productData = await getProductById(route.params.productId);
-      setProduct(productData);
-    } catch (err) {
-      console.error('Error loading product:', err);
-      setError('Failed to load product details');
-    } finally {
-      setLoading(false);
-    }
-  };
+  useEffect(() => {
+    const fetchFullProduct = async () => {
+      setFullProductLoading(true);
+      setFullProductError(null);
+      try {
+        const data = await fetchProductById(product.id);
+        setFullProduct(data);
+      } catch (err: any) {
+        setFullProductError(err.message || 'Failed to fetch full product data');
+      } finally {
+        setFullProductLoading(false);
+      }
+    };
+    fetchFullProduct();
+  }, [product.id]);
 
   const formatPrice = (price?: number) => {
     if (!price) return 'N/A';
@@ -92,25 +120,13 @@ export default function ProductDetailScreen() {
     }
   };
 
-  if (loading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#007AFF" />
-        <Text style={styles.loadingText}>Loading product details...</Text>
-      </View>
-    );
-  }
-
-  if (error || !product) {
+  if (!product) {
     return (
       <View style={styles.errorContainer}>
         <Icon name="alert-circle" size={64} color="#f44336" />
         <Text style={styles.errorText}>
-          {error || 'Product not found'}
+          {'Product not found'}
         </Text>
-        <TouchableOpacity style={styles.retryButton} onPress={loadProduct}>
-          <Text style={styles.retryButtonText}>Retry</Text>
-        </TouchableOpacity>
       </View>
     );
   }
@@ -245,6 +261,43 @@ export default function ProductDetailScreen() {
             </View>
           )}
         </View>
+      </View>
+
+      {/* Per-branch stock section */}
+      <View style={{ backgroundColor: '#fff', margin: 16, borderRadius: 8, padding: 12 }}>
+        <Text style={{ fontWeight: 'bold', fontSize: 16, marginBottom: 8 }}>Stock by Location</Text>
+        {stockLoading && <Text>Loading stock...</Text>}
+        {stockError && <Text style={{ color: 'red' }}>{stockError}</Text>}
+        {!stockLoading && !stockError && stock && (
+          <>
+            {['Newtown Store, NSW', 'Paddington Store, NSW'].map(branch => {
+              // Sum available stock for all matching stock units for this branch
+              const totalAvailable = stock
+                .filter(s => s.branchName === branch)
+                .reduce((sum, s) => sum + (s.available || 0), 0);
+              return (
+                <View key={branch} style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
+                  <Text>{branch}:</Text>
+                  <Text style={{ fontWeight: 'bold' }}>{totalAvailable}</Text>
+                </View>
+              );
+            })}
+          </>
+        )}
+      </View>
+
+      {/* Raw Data Debug Section */}
+      <View style={{ backgroundColor: '#222', margin: 16, borderRadius: 8, padding: 12 }}>
+        <Text style={{ color: '#fff', fontWeight: 'bold', marginBottom: 8 }}>Raw Product Data (Cin7 API):</Text>
+        {fullProductLoading && <Text style={{ color: '#fff' }}>Loading full product data...</Text>}
+        {fullProductError && <Text style={{ color: 'red' }}>{fullProductError}</Text>}
+        {!fullProductLoading && !fullProductError && (
+          <ScrollView horizontal style={{ maxHeight: 300 }}>
+            <Text style={{ color: '#fff', fontSize: 12 }} selectable>
+              {fullProduct ? JSON.stringify(fullProduct, null, 2) : 'No product data found.'}
+            </Text>
+          </ScrollView>
+        )}
       </View>
     </ScrollView>
   );

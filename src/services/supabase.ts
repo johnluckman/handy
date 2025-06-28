@@ -3,7 +3,10 @@ import { createClient } from '@supabase/supabase-js';
 // If using react-native-dotenv or Expo config:
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from '@env';
 
-export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const SUPABASE_URL_EXPO = process.env.EXPO_PUBLIC_SUPABASE_URL; // or your env variable
+const SUPABASE_ANON_KEY_EXPO = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+
+export const supabase = createClient(SUPABASE_URL_EXPO, SUPABASE_ANON_KEY_EXPO);
 
 // Generic database operations that can be used across tools
 export class DatabaseService {
@@ -213,7 +216,9 @@ export const databaseService = new DatabaseService();
 
 // Legacy function for backward compatibility
 export async function fetchProducts() {
-  const { data, error } = await supabase.from('products').select('*');
+  const { data, error } = await supabase
+    .from('products')
+    .select('*'); // or specify fields: .select('id,name,sku')
   if (error) throw error;
   return data;
 }

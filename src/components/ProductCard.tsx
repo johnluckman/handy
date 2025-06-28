@@ -63,9 +63,9 @@ export default function ProductCard({ product, onPress }: ProductCardProps) {
   return (
     <TouchableOpacity style={styles.container} onPress={onPress}>
       <View style={styles.imageContainer}>
-        {product.images && product.images.length > 0 ? (
+        {product.images && product.images.length > 0 && product.images[0].link ? (
           <Image
-            source={{ uri: product.images[0] }}
+            source={{ uri: product.images[0].link }}
             style={styles.image}
             resizeMode="cover"
           />
