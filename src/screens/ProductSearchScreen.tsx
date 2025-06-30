@@ -57,17 +57,29 @@ export default function ProductSearchScreen() {
     navigation.navigate('BarcodeScanner');
   };
 
-  // Sync handler: call API endpoint to sync Cin7 to Supabase, then reload products
-  const handleSyncCin7 = async () => {
+  // Sync handler: call API endpoint to sync Cin7 stock to Supabase, then reload products
+  const handleSyncStock = async () => {
     setSyncing(true);
     try {
-      // Placeholder: call your backend API to trigger the sync script
-      await fetch('/api/syncCin7', { method: 'POST' });
-      // After sync, reload products from Supabase (or trigger your normal fetch)
-      await handleSearch(searchQuery);
-      Alert.alert('Sync Complete', 'Cin7 data has been synced to Supabase.');
+      // Call the API server to trigger the stock sync script
+      const response = await fetch('http://localhost:3001/api/syncStock', { 
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
+      
+      const result = await response.json();
+      
+      if (result.success) {
+        // After sync, reload products from Supabase
+        await handleSearch(searchQuery);
+        Alert.alert('Stock Sync Complete', 'Cin7 stock data has been synced to Supabase.');
+      } else {
+        throw new Error(result.message || 'Stock sync failed');
+      }
     } catch (err) {
-      Alert.alert('Sync Failed', err.message || 'Failed to sync Cin7 data.');
+      Alert.alert('Stock Sync Failed', err instanceof Error ? err.message : 'Failed to sync Cin7 stock data.');
     } finally {
       setSyncing(false);
     }
@@ -125,8 +137,8 @@ export default function ProductSearchScreen() {
             <TouchableOpacity style={styles.scanButton} onPress={handleBarcodeScan}>
               <Icon name="barcode-scan" size={24} color="#fff" />
             </TouchableOpacity>
-            <TouchableOpacity style={styles.fetchButton} onPress={handleSyncCin7} disabled={syncing}>
-              <Icon name="download" size={24} color="#fff" />
+            <TouchableOpacity style={styles.syncStockButton} onPress={handleSyncStock} disabled={syncing}>
+              <Icon name="database-sync" size={24} color="#fff" />
             </TouchableOpacity>
             {syncing && (
               <ActivityIndicator size="small" color="#fff" style={{ marginLeft: 8 }} />
@@ -199,8 +211,8 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginLeft: 12,
   },
-  fetchButton: {
-    backgroundColor: '#4CAF50',
+  syncStockButton: {
+    backgroundColor: '#FF9800',
     padding: 12,
     borderRadius: 8,
     marginLeft: 8,

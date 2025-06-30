@@ -8,11 +8,7 @@ const CIN7_API_URL = process.env.CIN7_API_URL;
 const CIN7_USERNAME = process.env.CIN7_USERNAME;
 const CIN7_API_KEY = process.env.CIN7_API_KEY;
 
-const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
-
-if (!globalThis.fetch) {
-  globalThis.fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args));
-}
+const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 function getAuthHeader() {
   return 'Basic ' + Buffer.from(`${CIN7_USERNAME}:${CIN7_API_KEY}`).toString('base64');
@@ -23,7 +19,6 @@ async function fetchCin7Products() {
   let page = 1;
   let fetched = 0;
   const pageSize = 250;
-
   while (true) {
     const url = `${CIN7_API_URL}/Products?page=${page}&rows=${pageSize}`;
     const headers = {
@@ -32,17 +27,13 @@ async function fetchCin7Products() {
     };
     const res = await fetch(url, { headers });
     const data = await res.json();
-
     if (!Array.isArray(data) || data.length === 0) break;
-
     allProducts.push(...data);
     fetched += data.length;
-    if (data.length < pageSize) break; // Last page reached
-
+    if (data.length < pageSize) break;
     page++;
   }
-
-  console.log(`Fetched ${allProducts.length} products from Cin7.`);
+  console.log(`Fetched ${allProducts.length} products from Cin7 (for stock sync).`);
   return Array.isArray(allProducts) ? allProducts : allProducts.Products || [];
 }
 
@@ -56,41 +47,47 @@ async function fetchCin7Stock(productId) {
   return await res.json();
 }
 
-async function sync() {
+async function syncStock() {
   const products = await fetchCin7Products();
+  let totalStockItems = 0;
   for (const product of products) {
-    const { data, error } = await supabase.from('products').upsert(product);
-    if (error) {
-      console.error('Supabase error:', error);
-    } else {
-      console.log('Inserted/Upserted product:', data);
-    }
     const stockItems = await fetchCin7Stock(product.id);
     if (Array.isArray(stockItems)) {
       for (const stock of stockItems) {
-        await supabase.from('stock').upsert(
-          {
-            product_id: product.id,
-            ...stock
-          },
-          { onConflict: ['product_id', 'branch_id', 'product_option_id'] }
-        );
+        const row = {
+          productId: stock.ProductId || stock.productOptionId,
+          productOptionId: stock.productOptionId,
+          modifiedDate: stock.modifiedDate,
+          styleCode: stock.styleCode,
+          code: stock.code,
+          barcode: stock.barcode,
+          branchId: stock.branchId,
+          branchName: stock.branchName,
+          productName: stock.productName,
+          option1: stock.option1,
+          option2: stock.option2,
+          option3: stock.option3,
+          size: stock.size,
+          available: stock.available,
+          stockOnHand: stock.stockOnHand,
+          openSales: stock.openSales,
+          incoming: stock.incoming,
+          virtual: stock.virtual,
+          holding: stock.holding
+        };
+        const { error } = await supabase.from('stock').upsert(row, {
+          onConflict: ['productId', 'productOptionId', 'branchId']
+        });
+        if (error) {
+          console.error('Supabase stock upsert error:', error);
+        } else {
+          totalStockItems++;
+        }
       }
+      console.log(`Synced stock for product ${product.id} (${stockItems.length} items).`);
     }
-    console.log(`Synced product ${product.id} and ${stockItems.length || 0} stock items.`);
   }
-  console.log('Sync complete!');
+  console.log(`Stock sync complete! Total stock items upserted: ${totalStockItems}`);
 }
 
-console.log('SUPABASE_URL:', process.env.SUPABASE_URL);
-console.log('SUPABASE_KEY:', process.env.SUPABASE_KEY ? 'set' : 'NOT SET');
-
-const res = await fetch(`${process.env.SUPABASE_URL}/rest/v1/products`, {
-  headers: {
-    apikey: process.env.SUPABASE_KEY,
-    Authorization: `Bearer ${process.env.SUPABASE_KEY}`,
-  }
-});
-console.log('Test fetch status:', res.status);
-
-sync(); 
+syncStock(); 

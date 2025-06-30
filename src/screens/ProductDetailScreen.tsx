@@ -22,10 +22,13 @@ type RootStackParamList = {
 type ProductDetailScreenNavigationProp = StackNavigationProp<RootStackParamList, 'ProductDetail'>;
 type ProductDetailScreenRouteProp = RouteProp<RootStackParamList, 'ProductDetail'>;
 
+// If Product type is missing 'code', extend it here for this file:
+type ProductWithCode = Product & { code?: string };
+
 export default function ProductDetailScreen() {
   const navigation = useNavigation<ProductDetailScreenNavigationProp>();
   const route = useRoute<ProductDetailScreenRouteProp>();
-  const product = route.params.product;
+  const product = route.params.product as ProductWithCode;
   const [stock, setStock] = useState<StockUnit[] | null>(null);
   const [stockLoading, setStockLoading] = useState(false);
   const [stockError, setStockError] = useState<string | null>(null);
@@ -177,7 +180,7 @@ export default function ProductDetailScreen() {
 
         <View style={styles.priceContainer}>
           <Text style={styles.priceLabel}>Price:</Text>
-          <Text style={styles.price}>{formatPrice(product.price)}</Text>
+          <Text style={styles.price}>{formatPrice(product.retailPrice)}</Text>
         </View>
 
         {/* Basic Info */}
@@ -185,8 +188,8 @@ export default function ProductDetailScreen() {
           <Text style={styles.sectionTitle}>Basic Information</Text>
           
           <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>SKU:</Text>
-            <Text style={styles.infoValue}>{product.sku}</Text>
+            <Text style={styles.infoLabel}>Code:</Text>
+            <Text style={styles.infoValue}>{product.code}</Text>
           </View>
 
           {product.barcode && (

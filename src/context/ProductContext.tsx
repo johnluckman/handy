@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useCallback } from 'react';
-import { Product, ProductSearchParams } from '../types/Product';
-import { fetchProducts as fetchProductsService } from '../services/cin7Api';
+import { Product } from '../types/Product';
+import { databaseService } from '../services/supabase';
 
 interface ProductContextType {
   products: Product[];
@@ -23,12 +23,15 @@ export function ProductProvider({ children }: { children: React.ReactNode }) {
     setLoading(true);
     setError(null);
     try {
-      const searchParams: ProductSearchParams = {
-        query: query.trim(),
-        limit: 100,
-      };
-      const response = await fetchProductsService(searchParams);
-      setProducts(response.products);
+      const { data, error } = await databaseService.searchRecords<Product>(
+        'products',
+        ['name', 'code', 'barcode'],
+        query,
+        undefined,
+        { rows: 100, page: 1, orderBy: 'name', ascending: true }
+      );
+      if (error) throw error;
+      setProducts(data);
     } catch (err) {
       console.error('Error searching products:', err);
       setError(err instanceof Error ? err.message : 'Failed to search products');

@@ -1,12 +1,14 @@
 import { createClient } from '@supabase/supabase-js';
 
-// If using react-native-dotenv or Expo config:
-import { SUPABASE_URL, SUPABASE_ANON_KEY } from '@env';
+// Use the Expo public environment variables
+const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL;
+const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
 
-const SUPABASE_URL_EXPO = process.env.EXPO_PUBLIC_SUPABASE_URL; // or your env variable
-const SUPABASE_ANON_KEY_EXPO = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+  throw new Error('Missing Supabase environment variables. Please check your .env file.');
+}
 
-export const supabase = createClient(SUPABASE_URL_EXPO, SUPABASE_ANON_KEY_EXPO);
+export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // Generic database operations that can be used across tools
 export class DatabaseService {

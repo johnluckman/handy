@@ -26,8 +26,48 @@ interface SubmissionData {
  * @returns {Promise<any>} The response from the Google Apps Script.
  */
 export async function appendToSheet(data: any) {
-  // TODO: Implement actual Google Sheets integration
-  return { success: true, batchSize: 1, message: 'Stub: Data would be sent to Google Sheets.' };
+  try {
+    if (!EXPO_PUBLIC_APPS_SCRIPT_URL) {
+      console.warn('⚠️ Google Apps Script URL not configured, using mock implementation');
+      console.warn('📝 See DEPLOYMENT.md for setup instructions');
+      return await mockAppendToSheet(data);
+    }
+
+    console.log('📤 Sending data to Google Sheets via Apps Script...');
+    console.log('🌐 Using Apps Script URL:', EXPO_PUBLIC_APPS_SCRIPT_URL);
+
+    const response = await fetch(EXPO_PUBLIC_APPS_SCRIPT_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        action: 'append',
+        data: data
+      }),
+    });
+
+    if (!response.ok) {
+      console.error('❌ Failed to append to sheet:', response.status, response.statusText);
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    const result = await response.json();
+    
+    if (result.success) {
+      console.log('✅ Successfully appended to Google Sheets:', result);
+      return result;
+    } else {
+      console.error('❌ Google Apps Script returned error:', result);
+      throw new Error(result.message || 'Unknown error from Google Apps Script');
+    }
+  } catch (error) {
+    console.error('❌ Error appending to sheet:', error);
+    console.warn('💡 This might be due to missing Google Apps Script setup. See DEPLOYMENT.md');
+    // Fallback to mock implementation if network fails
+    console.warn('🔄 Falling back to mock implementation due to error');
+    return await mockAppendToSheet(data);
+  }
 }
 
 /**
@@ -56,8 +96,53 @@ async function mockAppendToSheet(batch: object[]): Promise<any> {
  * @param {string} store - The store name to fetch owed data for (e.g., "Newtown", "Paddington")
  */
 export async function fetchOwedData(store?: string) {
-  // TODO: Implement actual fetch logic
-  return null;
+  try {
+    if (!EXPO_PUBLIC_APPS_SCRIPT_URL) {
+      console.warn('⚠️ Google Apps Script URL not configured. Please set EXPO_PUBLIC_APPS_SCRIPT_URL in your .env file');
+      return null;
+    }
+
+    // Build the URL safely
+    const url = new URL(EXPO_PUBLIC_APPS_SCRIPT_URL);
+    url.searchParams.set('action', 'fetchOwed');
+    if (store) url.searchParams.set('store', store);
+
+    console.log('🔍 Fetching owed data for store:', store || 'all stores');
+    console.log('🌐 Using Apps Script URL:', url.toString());
+
+    const response = await fetch(url.toString(), {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      console.error('❌ Failed to fetch owed data:', response.status, response.statusText);
+      return null;
+    }
+
+    // Try to parse JSON, log the raw text if it fails
+    let data;
+    try {
+      data = await response.json();
+    } catch (jsonError) {
+      const raw = await response.text();
+      console.error('❌ Response was not valid JSON:', raw);
+      return null;
+    }
+
+    if (data.success && data.owedData) {
+      console.log('✅ Successfully fetched owed data:', data.owedData);
+      return data.owedData;
+    } else {
+      console.warn('⚠️ No owed data returned or fetch failed:', data);
+      return null;
+    }
+  } catch (error) {
+    console.error('❌ Error fetching owed data:', error);
+    return null;
+  }
 }
 
 // The old testConnection function has been removed as it was obsolete. 
