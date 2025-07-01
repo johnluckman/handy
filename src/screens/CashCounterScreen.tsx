@@ -132,11 +132,38 @@ export default function CashCounterScreen(): React.ReactElement {
     }, 0);
   };
   
+  // Helper function to check if a denomination is complete
+  const checkDenominationComplete = (denomination: Denomination, rowData: RowData): boolean => {
+    const count = rowData?.actualCount ?? 0;
+    const actual = rowData?.actualFloat ?? 0;
+    const borrow = rowData?.borrow ?? 0;
+    const owed = rowData?.owed ?? 0;
+    const returned = rowData?.returned ?? 0;
+    const targetFloat = denomination.targetFloat;
+
+    // If no count, not complete
+    if (count === 0) return false;
+
+    // Check if float + borrow equals target
+    const isFloatComplete = Math.abs(actual + borrow - targetFloat) < 0.01;
+
+    // If there's money owed, check if returned amount is correct
+    if (owed > 0) {
+      const surplus = Math.max(0, count - actual);
+      // Returned should equal either owed amount or surplus (whichever is smaller)
+      const expectedReturned = Math.min(owed, surplus);
+      return isFloatComplete && returned === expectedReturned;
+    }
+
+    // If no money owed, just check if float is complete
+    return isFloatComplete;
+  };
+
   const total = useMemo(() => {
     return calculateTotal();
   }, [data, calculateTotal]);
 
-  const { totalActualFloat, idealFloat, totalBorrowed, totalReturned } = useMemo(() => {
+  const { totalActualFloat, idealFloat, totalBorrowed, totalReturned, allDenominationsComplete } = useMemo(() => {
     const idealFloatCalc = denominations.reduce(
       (sum, deno) => sum + deno.targetFloat * deno.value,
       0
@@ -145,13 +172,27 @@ export default function CashCounterScreen(): React.ReactElement {
     let actualFloat = 0;
     let borrowed = 0;
     let returned = 0;
+    let completedCount = 0;
 
     for (const id in data) {
       const denomination = denominations.find(d => d.id === id);
       if (denomination) {
-        actualFloat += ((data[id]?.actualFloat ?? 0) * denomination.value);
-        borrowed += (data[id].borrow || 0) * denomination.value;
-        returned += (data[id].returned || 0) * denomination.value;
+        const rowData = data[id];
+        const count = rowData?.actualCount ?? 0;
+        const actual = rowData?.actualFloat ?? 0;
+        const borrow = rowData?.borrow ?? 0;
+        const owed = rowData?.owed ?? 0;
+        const returnedAmount = rowData?.returned ?? 0;
+        
+        actualFloat += (actual * denomination.value);
+        borrowed += (borrow * denomination.value);
+        returned += (returnedAmount * denomination.value);
+
+        // Check if this denomination is complete (green state)
+        const isComplete = checkDenominationComplete(denomination, rowData);
+        if (isComplete) {
+          completedCount++;
+        }
       }
     }
 
@@ -160,6 +201,7 @@ export default function CashCounterScreen(): React.ReactElement {
       idealFloat: idealFloatCalc,
       totalBorrowed: borrowed,
       totalReturned: returned,
+      allDenominationsComplete: completedCount === denominations.length,
     };
   }, [data]);
 
@@ -398,9 +440,12 @@ export default function CashCounterScreen(): React.ReactElement {
 
             <View style={styles.buttonContainer}>
               <TouchableOpacity
-                style={[styles.submitButton, isLoading && styles.submitButtonDisabled]}
+                style={[
+                  styles.submitButton, 
+                  (isLoading || !allDenominationsComplete) && styles.submitButtonDisabled
+                ]}
                 onPress={handleSubmit}
-                disabled={isLoading}
+                disabled={isLoading || !allDenominationsComplete}
               >
                 {isLoading ? (
                   <View style={styles.submitButtonContent}>
@@ -411,7 +456,9 @@ export default function CashCounterScreen(): React.ReactElement {
                     <Text style={styles.submitButtonText}>Submitting...</Text>
                   </View>
                 ) : (
-                  <Text style={styles.submitButtonText}>Submit Count</Text>
+                  <Text style={styles.submitButtonText}>
+                    {allDenominationsComplete ? 'Submit Count' : 'Complete all cash values'}
+                  </Text>
                 )}
               </TouchableOpacity>
             </View>
@@ -543,7 +590,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   submitButtonDisabled: {
-    backgroundColor: '#a5d6a7',
+    backgroundColor: '#cccccc',
   },
   submitButtonText: {
     fontSize: 16,

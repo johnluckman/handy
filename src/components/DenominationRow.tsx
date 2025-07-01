@@ -18,57 +18,85 @@ export interface RowData {
 }
 
 export default function DenominationRow({ denomination, rowData, onRowDataChange }: DenominationRowProps): React.ReactElement {
-  const { id, value, image } = denomination;
+  const { id, value, image, targetFloat } = denomination;
+  
+  // Field touch states
   const [borrowFieldTouched, setBorrowFieldTouched] = useState(false);
   const [floatFieldTouched, setFloatFieldTouched] = useState(false);
   const [countFieldTouched, setCountFieldTouched] = useState(false);
   const [returnedFieldTouched, setReturnedFieldTouched] = useState(false);
+
+  // Extracted values for cleaner code
+  const count = rowData.actualCount ?? 0;
+  const actual = rowData.actualFloat ?? 0;
+  const borrow = rowData.borrow ?? 0;
+  const owed = rowData.owed ?? 0;
+  const returned = rowData.returned ?? 0;
+
+  // Calculated values
+  const actualValue = count * value;
+  const floatValue = actual * value;
+  const surplus = Math.max(0, count - actual);
+  const suggestedFloat = Math.min(count, targetFloat);
+  const suggestedBorrow = Math.max(0, targetFloat - count);
+  const returnedSuggestion = (owed > 0 && surplus > 0) ? Math.min(owed, surplus) : 0;
+  const isFloatAndBorrowCorrect = Math.abs(actual + borrow - targetFloat) < 0.01;
+  const showGreen = isFloatAndBorrowCorrect && borrowFieldTouched;
+
+  // Helper functions
+  const resetToUntouched = () => {
+    return {
+      actualCount: 0,
+      actualFloat: 0,
+      borrow: 0,
+      returned: 0,
+      owed: owed,
+    };
+  };
+
+  const clearOtherFields = (newCount: number) => {
+    return {
+      actualCount: newCount,
+      actualFloat: 0,
+      borrow: 0,
+      returned: 0,
+      owed: owed,
+    };
+  };
 
   const handleInputChange = (field: keyof RowData, text: string) => {
     const newCount = parseInt(text, 10) || 0;
     let newRowData = { ...rowData, [field]: newCount };
 
     if (field === 'actualCount') {
-      setFloatFieldTouched(false); // Reset float suggestion if count changes
-      // If count is cleared, clear all other fields
+      setFloatFieldTouched(false);
       if (!text || newCount === 0) {
-        newRowData = {
-          actualCount: 0,
-          actualFloat: 0,
-          borrow: 0,
-          returned: 0,
-          owed: 0,
-        };
+        newRowData = resetToUntouched();
       } else {
-        // If count is edited (not just cleared), clear float, borrow, and returned
-        newRowData = {
-          actualCount: newCount,
-          actualFloat: 0,
-          borrow: 0,
-          returned: 0,
-          owed: rowData.owed ?? 0,
-        };
+        newRowData = clearOtherFields(newCount);
       }
     }
 
     if (field === 'actualFloat') {
-      const target = denomination.targetFloat;
-      const actual = newCount;
-      newRowData.borrow = Math.max(0, target - actual);
-      setBorrowFieldTouched(false); // Always reset to suggestion mode
+      const calculatedBorrow = Math.max(0, targetFloat - newCount);
+      newRowData.borrow = calculatedBorrow;
+      setBorrowFieldTouched(false);
+      
       if (!text || newCount === 0) {
-        setFloatFieldTouched(false); // Revert to suggestion mode if cleared
-        newRowData.borrow = 0; // Also clear borrow if float is cleared
+        setFloatFieldTouched(false);
+        setReturnedFieldTouched(false);
+        newRowData.borrow = 0;
+        newRowData.returned = 0;
       } else {
-        setFloatFieldTouched(true); // Mark float as touched
+        setFloatFieldTouched(true);
       }
     }
 
     if (field === 'returned') {
       if (!text || newCount === 0) {
-        setReturnedFieldTouched(false); // Revert to suggestion mode if cleared
+        setReturnedFieldTouched(false);
       } else {
-        setReturnedFieldTouched(true); // Mark returned as touched
+        setReturnedFieldTouched(true);
       }
     }
 
@@ -78,10 +106,7 @@ export default function DenominationRow({ denomination, rowData, onRowDataChange
   const handleBorrowFocus = () => {
     if (!borrowFieldTouched) {
       setBorrowFieldTouched(true);
-      // Fill the field with the current calculated value when first touched
-      const target = denomination.targetFloat;
-      const actual = rowData.actualFloat ?? 0;
-      const calculatedBorrow = Math.max(0, target - actual);
+      const calculatedBorrow = Math.max(0, targetFloat - actual);
       const newRowData = { ...rowData, borrow: calculatedBorrow };
       onRowDataChange(id, newRowData);
     }
@@ -90,29 +115,10 @@ export default function DenominationRow({ denomination, rowData, onRowDataChange
   const handleFloatFocus = () => {
     if (!floatFieldTouched) {
       setFloatFieldTouched(true);
-      // Fill the field with the current suggested value when first touched
-      const suggested = Math.min(rowData.actualCount ?? 0, denomination.targetFloat);
-      const newRowData = { ...rowData, actualFloat: suggested };
+      const newRowData = { ...rowData, actualFloat: suggestedFloat };
       onRowDataChange(id, newRowData);
     }
   };
-
-  const actualValue = rowData.actualCount * value;
-  const floatValue = (rowData.actualFloat ?? 0) * value;
-
-  // Calculate the suggested borrow amount
-  const target = denomination.targetFloat;
-  const actual = rowData.actualFloat ?? 0;
-  const borrow = rowData.borrow ?? 0;
-  const count = rowData.actualCount ?? 0;
-  const suggestedFloat = Math.min(count, target);
-  const suggestedBorrow = Math.max(0, target - count);
-
-  // Calculate surplus and returned suggestion early
-  const surplus = Math.max(0, count - actual);
-  const owed = Math.max(0, rowData.owed ?? 0);
-  const maxReturn = Math.min(surplus, owed);
-  const returnedSuggestion = (rowData.owed > 0 && surplus > 0) ? Math.min(rowData.owed, surplus) : 0;
 
   const handleReturnedFocus = () => {
     if (!returnedFieldTouched && returnedSuggestion > 0) {
@@ -122,90 +128,146 @@ export default function DenominationRow({ denomination, rowData, onRowDataChange
     }
   };
 
-  // Determine if float + borrow matches target
-  const isFloatAndBorrowCorrect = Math.abs(actual + borrow - target) < 0.01;
-
-  // Float suggestion logic (subtract suggestedBorrow)
-  const floatDisplayValue = floatFieldTouched ? (rowData.actualFloat ?? 0).toString() : '';
-  const floatPlaceholder = !floatFieldTouched ? suggestedFloat.toString() : '0';
-
-  // Determine what to show in the borrow field
-  const borrowDisplayValue = borrowFieldTouched ? (rowData.borrow ?? 0).toString() : '';
-  const borrowPlaceholder = !borrowFieldTouched && suggestedBorrow > 0 ? suggestedBorrow.toString() : '0';
-
-  // Only apply green if sum matches AND borrow field is not in suggestion mode
-  const showGreen = isFloatAndBorrowCorrect && borrowFieldTouched;
-
-  // Helper text logic (fully retroactive and robust)
-  let helperText = '';
-  // 0. Review float if actualFloat > target or actualFloat > count
-  if (actual > target || actual > count) {
-    helperText = 'Review float amount';
-  }
-  // 1. Return to safe (if owed and surplus)
-  else if (owed > 0 && surplus) {
-    if (actual >= target) {
-      if (rowData.returned > 0) {
-        if (rowData.returned === surplus) {
-          helperText = `✅ You've returned ${surplus}× $${value.toFixed(2)} to safe.`;
-        } else if (rowData.returned < surplus) {
-          helperText = "Review returned amount. You have more surplus to return.";
-        } else if (rowData.returned > surplus) {
-          helperText = "Returned amount is too high. Please check and correct.";
+  // Helper text logic
+  const getHelperText = (): string => {
+    // 0. Review float if actualFloat > target or actualFloat > count
+    if (actual > targetFloat || actual > count) {
+      return 'Review float amount — it looks too high.';
+    }
+    
+    // 0.5. Check if returned amount exceeds owed amount
+    if (returned > owed && owed > 0) {
+      return "You've returned too much. You can't return more than what's owed.";
+    }
+    
+    // 1. Return to safe (if owed and surplus)
+    if (owed > 0 && surplus) {
+      if (actual >= targetFloat) {
+        if (returned > 0) {
+          if (returned === owed) {
+            const remainingSurplus = surplus - returned;
+            if (remainingSurplus > 0) {
+              return `✅ Returned ${returned}× $${value.toFixed(2)} to safe. Put remaining ${remainingSurplus}× $${value.toFixed(2)} into today's bag.`;
+            } else {
+              return `✅ Returned ${returned}× $${value.toFixed(2)} to safe.`;
+            }
+          } else if (returned === surplus) {
+            return `✅ Returned ${surplus}× $${value.toFixed(2)} to safe.`;
+          } else if (returned < Math.min(owed, surplus)) {
+            return "Still more to return — Check the amount.";
+          } else if (returned > surplus) {
+            return "Returned amount is too high — Please check.";
+          }
+        } else {
+          return `Return ${Math.min(owed, surplus)}× $${value.toFixed(2)} to safe. Enter returned amount.`;
         }
       } else {
-        helperText = `Return ${surplus} × $${value.toFixed(2)} to safe. Enter returned amount.`;
+        if (count < targetFloat) {
+          return `Not enough for the float. Enter what you have (${count} × $${value.toFixed(0)}). Borrow the rest from the safe.`;
+        } else {
+          return `Put ${targetFloat} × $${value.toFixed(0)} back into till.`;
+        }
       }
-    } else {
-      if (count < target) {
-        helperText = `You don't have enough for the float. Enter the max you have below (${count} × $${value.toFixed(0)}). You'll borrow the rest from the safe.`;
+    }
+    
+    // 2. Borrow (if borrow > 0)
+    if (borrow > 0) {
+      return `✅ You've borrowed ${borrow}× $${value.toFixed(0)} to complete the float.`;
+    }
+    
+    // 3. Check (if actualFloat + borrow === target AND count > 0)
+    if ((actual + borrow) === targetFloat && count > 0) {
+      if (count > actual) {
+        return `✅ Put the remaining ${count - actual}× $${value.toFixed(0)} into today's bag.`;
       } else {
-        helperText = `Put ${target} × $${value.toFixed(0)} back into till.`;
+        return '✅ All done!';
       }
     }
-  }
-  // 1. Borrow (if borrow > 0)
-  else if (borrow > 0) {
-    helperText = `✅ You've borrowed ${borrow}× $${value.toFixed(0)} to make the full float.`;
-  }
-  // 2. Check (if actualFloat + borrow === target AND count > 0)
-  else if ((actual + borrow) === target && count > 0) {
-    if (count > actual) {
-      helperText = `✅ Put remaining ${count - actual}× $${value.toFixed(0)} into today's bag.`;
-    } else {
-      helperText = '✅';
+    
+    // 4. Borrow needed (if float entered but less than target, and borrow is 0)
+    if (count > 0 && actual < targetFloat && borrow === 0 && actual > 0) {
+      return `You're short by ${targetFloat - actual}× $${value.toFixed(0)}. Borrow from the safe and enter amount below.`;
     }
-  }
-  // 3. Borrow needed (if float entered but less than target, and borrow is 0)
-  else if (count > 0 && actual < target && borrow === 0 && actual > 0) {
-    helperText = `You need to borrow ${target - actual} × $${value.toFixed(0)} from safe. Enter borrowed amount after confirming.`;
-  }
-  // 3. Float (if count > 0 and actualFloat < target)
-  else if (count > 0 && actual < target) {
-    if (count < target) {
-      helperText = `You don't have enough for the float. Put ${count}× $${value.toFixed(0)} back into till. You'll borrow the rest from the safe.`;
-    } else {
-      helperText = `Put ${target} × $${value.toFixed(0)} back into till.`;
+    
+    // 5. Float (if count > 0 and actualFloat < target)
+    if (count > 0 && actual < targetFloat) {
+      if (count < targetFloat) {
+        return `Not enough for float. Put ${count}× $${value.toFixed(0)} back into the till. Borrow the rest from the safe.`;
+      } else {
+        return `Put ${targetFloat} × $${value.toFixed(0)} back into till.`;
+      }
     }
-  }
-  // 4. Count (if count is 0 or empty)
-  else {
-    helperText = 'Count everything in the till';
-  }
+    
+    // 6. Count (if count is 0 or empty)
+    return 'Count everything in the till to start.';
+  };
 
-  // Determine if this is the final step (success state)
-  const isFinalStep = helperText.includes('✅');
-
-  // Count suggestion logic
-  const countDisplayValue = countFieldTouched ? (rowData.actualCount ?? 0).toString() : '';
+  // Display values and placeholders
+  const countDisplayValue = countFieldTouched ? count.toString() : '';
   const countPlaceholder = '-';
-
-  // Returned suggestion logic
-  const returnedDisplayValue = returnedFieldTouched ? (rowData.returned ?? 0).toString() : '';
+  
+  const floatDisplayValue = floatFieldTouched ? actual.toString() : '';
+  const floatPlaceholder = !floatFieldTouched ? suggestedFloat.toString() : '0';
+  
+  const borrowDisplayValue = borrowFieldTouched ? borrow.toString() : '';
+  const borrowPlaceholder = !borrowFieldTouched && suggestedBorrow > 0 ? suggestedBorrow.toString() : '0';
+  
+  const returnedDisplayValue = returnedFieldTouched ? returned.toString() : '';
   const returnedPlaceholder = !returnedFieldTouched ? returnedSuggestion.toString() : '0';
 
-  // Returned error logic
-  const returnedError = rowData.returned > surplus;
+  // Computed values
+  const helperText = getHelperText();
+  const isFinalStep = helperText.includes('✅');
+  const returnedError = returned > surplus || (returned > owed && owed > 0) || (returned > 0 && returned < owed);
+  const isDisabled = denomination.value === 100;
+  const isFloatMatch = denomination.targetFloat === actual;
+
+  // Input styles
+  const getCountInputStyle = () => [
+    styles.input,
+    !countFieldTouched && styles.suggestedBorrowInput,
+    countFieldTouched && count > 0 && styles.greenInput,
+  ];
+
+  const getFloatInputStyle = () => {
+    if (isDisabled || count === 0) {
+      return [styles.input, styles.disabledInput];
+    }
+    
+    return [
+      styles.input,
+      (actual > targetFloat || actual > count) && styles.redInput,
+      !isDisabled && !floatFieldTouched && styles.suggestedBorrowInput,
+      showGreen && styles.greenInput,
+      isFloatMatch && styles.floatMatchInput,
+    ].filter(Boolean);
+  };
+
+  const getBorrowInputStyle = () => {
+    const shouldDisable = count === 0 || isDisabled || actual > targetFloat || actual > count || !(actual > 0);
+    
+    if (shouldDisable) {
+      return [styles.input, styles.disabledInput];
+    }
+    
+    return [
+      styles.input,
+      !borrowFieldTouched && suggestedBorrow > 0 && styles.suggestedBorrowInput,
+      showGreen && styles.greenInput,
+      isFloatMatch && styles.disabledInput,
+    ].filter(Boolean);
+  };
+
+  const getReturnedInputStyle = () => [
+    styles.input,
+    returnedError && styles.redInput,
+    !returnedFieldTouched && returnedSuggestion > 0 && styles.suggestedBorrowInput,
+    !isReturnedEditable && styles.disabledInput,
+    (returned === owed && owed > 0) && styles.greenInput,
+  ];
+
+  const isBorrowEditable = count > 0 && !(actual > targetFloat) && !isDisabled && !isFloatMatch && actual > 0;
+  const isReturnedEditable = surplus > 0 && !isDisabled && owed !== 0 && actual >= targetFloat;
 
   return (
     <View style={[
@@ -231,16 +293,12 @@ export default function DenominationRow({ denomination, rowData, onRowDataChange
             <Text style={styles.label}>Count</Text>
           </View>
           <TextInput
-            style={[
-              styles.input,
-              !countFieldTouched && styles.suggestedBorrowInput,
-              countFieldTouched && rowData.actualCount > 0 && styles.greenInput,
-            ]}
+            style={getCountInputStyle()}
             keyboardType="number-pad"
             value={countDisplayValue}
             onChangeText={(text) => {
               if (!text || text === '0') {
-                setCountFieldTouched(false); // Reset to untouched state
+                setCountFieldTouched(false);
               } else {
                 setCountFieldTouched(true);
               }
@@ -256,27 +314,17 @@ export default function DenominationRow({ denomination, rowData, onRowDataChange
         {/* Actual Float */}
         <View style={styles.inputGroup}>
           <View style={styles.labelContainer}>
-            <Text style={styles.label}>{`Float (${denomination.targetFloat})`}</Text>
+            <Text style={styles.label}>{`Float (${targetFloat})`}</Text>
           </View>
           <TextInput
-            style={
-              (denomination.value === 100 || count === 0)
-                ? [styles.input, styles.disabledInput]
-                : [
-                    styles.input,
-                    (actual > target || actual > count) && styles.redInput,
-                    denomination.value !== 100 && !floatFieldTouched && styles.suggestedBorrowInput,
-                    showGreen && styles.greenInput,
-                    (denomination.targetFloat === rowData.actualFloat) && styles.floatMatchInput,
-                  ].filter(Boolean)
-            }
+            style={getFloatInputStyle()}
             keyboardType="number-pad"
             value={floatDisplayValue}
             onChangeText={(text) => handleInputChange('actualFloat', text)}
-            onFocus={denomination.value !== 100 && count > 0 ? handleFloatFocus : undefined}
+            onFocus={!isDisabled && count > 0 ? handleFloatFocus : undefined}
             placeholder={floatPlaceholder}
-            editable={denomination.value !== 100 && count > 0 ? true : false}
-            selectTextOnFocus={denomination.value !== 100 && count > 0}
+            editable={!isDisabled && count > 0}
+            selectTextOnFocus={!isDisabled && count > 0}
           />
           <Text style={styles.valueText}>{`$${floatValue.toFixed(2)}`}</Text>
         </View>
@@ -288,21 +336,12 @@ export default function DenominationRow({ denomination, rowData, onRowDataChange
             <Text style={styles.label}>Borrow</Text>
           </View>
           <TextInput
-            style={
-              (count === 0 || denomination.value === 100 || actual > target || actual > count || !(rowData.actualFloat > 0))
-                ? [styles.input, styles.disabledInput]
-                : [
-                    styles.input,
-                    !borrowFieldTouched && suggestedBorrow > 0 && styles.suggestedBorrowInput,
-                    showGreen && styles.greenInput,
-                    (denomination.targetFloat === rowData.actualFloat) && styles.disabledInput,
-                  ].filter(Boolean)
-            }
+            style={getBorrowInputStyle()}
             keyboardType="number-pad"
             value={borrowDisplayValue}
             onChangeText={(text) => {
               if (!text || text === '0') {
-                setBorrowFieldTouched(false); // Reset to suggestion mode
+                setBorrowFieldTouched(false);
               } else {
                 setBorrowFieldTouched(true);
               }
@@ -310,7 +349,7 @@ export default function DenominationRow({ denomination, rowData, onRowDataChange
             }}
             onFocus={handleBorrowFocus}
             placeholder={borrowPlaceholder}
-            editable={count > 0 && !(actual > target) && denomination.value !== 100 && denomination.targetFloat !== rowData.actualFloat && rowData.actualFloat > 0}
+            editable={isBorrowEditable}
             selectTextOnFocus={true}
           />
         </View>
@@ -325,9 +364,9 @@ export default function DenominationRow({ denomination, rowData, onRowDataChange
             style={[
               styles.input,
               styles.disabledInput,
-              (rowData.owed > 0) && styles.owedInput,
+              (owed > 0) && styles.owedInput,
             ]}
-            value={(rowData.owed ?? 0) > 0 ? `-${rowData.owed}` : '0'}
+            value={owed > 0 ? `-${owed}` : '0'}
             editable={false}
           />
         </View>
@@ -339,20 +378,13 @@ export default function DenominationRow({ denomination, rowData, onRowDataChange
             <Text style={styles.label}>Return</Text>
           </View>
           <TextInput
-            style={[
-              styles.input,
-              returnedError && styles.redInput,
-              !returnedFieldTouched && returnedSuggestion > 0 && styles.suggestedBorrowInput,
-              denomination.value === 100 && styles.disabledInput,
-              (rowData.owed === 0 || surplus <= 0) && styles.disabledInput,
-              (rowData.returned === rowData.owed && rowData.owed > 0) && styles.greenInput,
-            ]}
+            style={getReturnedInputStyle()}
             keyboardType="number-pad"
             value={surplus > 0 ? returnedDisplayValue : '0'}
             onChangeText={(text) => handleInputChange('returned', text)}
             onFocus={handleReturnedFocus}
             placeholder={returnedPlaceholder}
-            editable={surplus > 0 && denomination.value !== 100 && rowData.owed !== 0}
+            editable={isReturnedEditable}
             selectTextOnFocus={true}
           />
         </View>
@@ -398,18 +430,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    height: 16, // Ensures consistent alignment
+    height: 16,
     marginBottom: 4,
   },
   icon: {
-    // marginRight: 4, // Removed to bring icon and text closer
+    // Empty - icon styling handled by react-native-vector-icons
   },
   label: {
     fontSize: 12,
     color: '#666',
   },
   input: {
-    borderWidth: .5,
+    borderWidth: 0.5,
     borderColor: '#ccc',
     borderRadius: 5,
     padding: 8,
@@ -417,51 +449,53 @@ const styles = StyleSheet.create({
     fontSize: 16,
     width: '100%',
   },
-  owedInput: {
-    backgroundColor: '#ffcdd2', // light red background
-    color: '#c62828', // dark red text
-    fontWeight: 'bold',
-  },
-  disabledInput: {
-    backgroundColor: '#d1d5db', // darker grey
-    color: '#888', // darker text
-  },
   valueText: {
     fontSize: 12,
     color: '#007AFF',
     marginTop: 4,
-  },
-  floatMatchInput: {
-    backgroundColor: '#a8e6c7', // lighter brand green
-    borderColor: '#39b878', // brand green
-  },
-  suggestedBorrowInput: {
-    backgroundColor: '#f8f8f8',
-    color: '#999',
-    fontStyle: 'italic',
-    // Do NOT override fontSize, padding, borderRadius, etc.
-  },
-  greenInput: {
-    backgroundColor: '#a8e6c7', // light green
-    color: '#1b5e20', // dark green text
-    borderColor: '#39b878',
-    fontWeight: 'bold',
   },
   helperText: {
     fontSize: 13,
     color: '#001D00',
     fontStyle: 'italic',
     marginBottom: 6,
-    marginLeft: 2,
-    marginRight: 2,
+    marginHorizontal: 2,
   },
+  successContainer: {
+    backgroundColor: '#d4edda',
+  },
+  
+  // Input state styles
+  disabledInput: {
+    backgroundColor: '#d1d5db',
+    color: '#888',
+  },
+  suggestedBorrowInput: {
+    backgroundColor: '#f8f8f8',
+    color: '#999',
+    fontStyle: 'italic',
+  },
+  
+  // Color-coded input styles
   redInput: {
-    backgroundColor: '#ffcdd2', // light red
-    color: '#c62828', // dark red text
+    backgroundColor: '#ffcdd2',
+    color: '#c62828',
     borderColor: '#c62828',
     fontWeight: 'bold',
   },
-  successContainer: {
-    backgroundColor: '#d4edda', // slightly darker green background
+  greenInput: {
+    backgroundColor: '#a8e6c7',
+    color: '#1b5e20',
+    borderColor: '#39b878',
+    fontWeight: 'bold',
+  },
+  owedInput: {
+    backgroundColor: '#ffcdd2',
+    color: '#c62828',
+    fontWeight: 'bold',
+  },
+  floatMatchInput: {
+    backgroundColor: '#a8e6c7',
+    borderColor: '#39b878',
   },
 }); 
