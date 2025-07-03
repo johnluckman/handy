@@ -41,7 +41,7 @@ export default function DenominationRow({ denomination, rowData, onRowDataChange
   const suggestedBorrow = Math.max(0, targetFloat - count);
   const returnedSuggestion = (owed > 0 && surplus > 0) ? Math.min(owed, surplus) : 0;
   const isFloatAndBorrowCorrect = Math.abs(actual + borrow - targetFloat) < 0.01;
-  const showGreen = isFloatAndBorrowCorrect && borrowFieldTouched;
+  const showGreen = isFloatAndBorrowCorrect && borrowFieldTouched && (count > 0 || (count === 0 && borrow === targetFloat && countFieldTouched));
 
   // Helper functions
   const resetToUntouched = () => {
@@ -70,22 +70,26 @@ export default function DenominationRow({ denomination, rowData, onRowDataChange
 
     if (field === 'actualCount') {
       setFloatFieldTouched(false);
-      if (!text || newCount === 0) {
+      if (!text) {
         newRowData = resetToUntouched();
       } else {
         newRowData = clearOtherFields(newCount);
+        // If count is 0 and user has touched the field, set borrow to target float
+        if (newCount === 0) {
+          newRowData.borrow = targetFloat;
+        }
       }
     }
 
     if (field === 'actualFloat') {
-      const calculatedBorrow = Math.max(0, targetFloat - newCount);
+      const calculatedBorrow = count === 0 ? targetFloat : Math.max(0, targetFloat - newCount);
       newRowData.borrow = calculatedBorrow;
       setBorrowFieldTouched(false);
       
       if (!text || newCount === 0) {
         setFloatFieldTouched(false);
         setReturnedFieldTouched(false);
-        newRowData.borrow = 0;
+        newRowData.borrow = count === 0 ? targetFloat : 0;
         newRowData.returned = 0;
       } else {
         setFloatFieldTouched(true);
@@ -106,7 +110,7 @@ export default function DenominationRow({ denomination, rowData, onRowDataChange
   const handleBorrowFocus = () => {
     if (!borrowFieldTouched) {
       setBorrowFieldTouched(true);
-      const calculatedBorrow = Math.max(0, targetFloat - actual);
+      const calculatedBorrow = (count === 0 && countFieldTouched) ? targetFloat : Math.max(0, targetFloat - actual);
       const newRowData = { ...rowData, borrow: calculatedBorrow };
       onRowDataChange(id, newRowData);
     }
@@ -184,12 +188,21 @@ export default function DenominationRow({ denomination, rowData, onRowDataChange
       }
     }
     
-    // 4. Borrow needed (if float entered but less than target, and borrow is 0)
+    // 4. Count is 0 - need to borrow full target float
+    if (count === 0) {
+      if (borrow === targetFloat) {
+        return `✅ Borrowed ${targetFloat}× $${value.toFixed(0)} from safe for float.`;
+      } else {
+        return `No ${value.toFixed(2)} notes in till. Borrow ${targetFloat}× $${value.toFixed(0)} from safe.`;
+      }
+    }
+    
+    // 5. Borrow needed (if float entered but less than target, and borrow is 0)
     if (count > 0 && actual < targetFloat && borrow === 0 && actual > 0) {
       return `You're short by ${targetFloat - actual}× $${value.toFixed(0)}. Borrow from the safe and enter amount below.`;
     }
     
-    // 5. Float (if count > 0 and actualFloat < target)
+    // 6. Float (if count > 0 and actualFloat < target)
     if (count > 0 && actual < targetFloat) {
       if (count < targetFloat) {
         return `Not enough for float. Put ${count}× $${value.toFixed(0)} back into the till. Borrow the rest from the safe.`;
@@ -198,7 +211,7 @@ export default function DenominationRow({ denomination, rowData, onRowDataChange
       }
     }
     
-    // 6. Count (if count is 0 or empty)
+    // 7. Count (if count is 0 or empty)
     return 'Count everything in the till to start.';
   };
 
@@ -217,8 +230,8 @@ export default function DenominationRow({ denomination, rowData, onRowDataChange
 
   // Computed values
   const helperText = getHelperText();
-  const isFinalStep = helperText.includes('✅');
-  const returnedError = returned > surplus || (returned > owed && owed > 0) || (returned > 0 && returned < owed);
+  const isFinalStep = helperText.includes('✅') && (count > 0 || (count === 0 && countFieldTouched));
+  const returnedError = returned > surplus || (returned > owed && owed > 0) || (returned > 0 && returned < Math.min(owed, surplus) && owed > 0);
   const isDisabled = denomination.value === 100;
   const isFloatMatch = denomination.targetFloat === actual;
 
@@ -226,7 +239,7 @@ export default function DenominationRow({ denomination, rowData, onRowDataChange
   const getCountInputStyle = () => [
     styles.input,
     !countFieldTouched && styles.suggestedBorrowInput,
-    countFieldTouched && count > 0 && styles.greenInput,
+    countFieldTouched && (count > 0 || (count === 0 && borrow === targetFloat && countFieldTouched)) && styles.greenInput,
   ];
 
   const getFloatInputStyle = () => {
@@ -244,7 +257,7 @@ export default function DenominationRow({ denomination, rowData, onRowDataChange
   };
 
   const getBorrowInputStyle = () => {
-    const shouldDisable = count === 0 || isDisabled || actual > targetFloat || actual > count || !(actual > 0);
+    const shouldDisable = isDisabled || actual > targetFloat || actual > count || (count > 0 && !(actual > 0)) || (count === 0 && !countFieldTouched);
     
     if (shouldDisable) {
       return [styles.input, styles.disabledInput];
@@ -263,10 +276,10 @@ export default function DenominationRow({ denomination, rowData, onRowDataChange
     returnedError && styles.redInput,
     !returnedFieldTouched && returnedSuggestion > 0 && styles.suggestedBorrowInput,
     !isReturnedEditable && styles.disabledInput,
-    (returned === owed && owed > 0) && styles.greenInput,
+    !returnedError && ((returned === owed && owed > 0) || (returned === surplus && surplus > 0 && owed > 0)) && styles.greenInput,
   ];
 
-  const isBorrowEditable = count > 0 && !(actual > targetFloat) && !isDisabled && !isFloatMatch && actual > 0;
+  const isBorrowEditable = (count > 0 || (count === 0 && countFieldTouched)) && !(actual > targetFloat) && !isDisabled && !isFloatMatch && (count === 0 || actual > 0);
   const isReturnedEditable = surplus > 0 && !isDisabled && owed !== 0 && actual >= targetFloat;
 
   return (

@@ -141,11 +141,13 @@ export default function CashCounterScreen(): React.ReactElement {
     const returned = rowData?.returned ?? 0;
     const targetFloat = denomination.targetFloat;
 
-    // If no count, not complete
-    if (count === 0) return false;
-
     // Check if float + borrow equals target
     const isFloatComplete = Math.abs(actual + borrow - targetFloat) < 0.01;
+
+    // If count is 0, we need to borrow the full target float amount
+    if (count === 0) {
+      return isFloatComplete && borrow === targetFloat;
+    }
 
     // If there's money owed, check if returned amount is correct
     if (owed > 0) {
