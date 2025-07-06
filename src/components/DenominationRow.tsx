@@ -15,6 +15,7 @@ export interface RowData {
   borrow: number;
   returned: number;
   owed: number;
+  deposited: number;
 }
 
 export default function DenominationRow({ denomination, rowData, onRowDataChange }: DenominationRowProps): React.ReactElement {
@@ -32,6 +33,7 @@ export default function DenominationRow({ denomination, rowData, onRowDataChange
   const borrow = rowData.borrow ?? 0;
   const owed = rowData.owed ?? 0;
   const returned = rowData.returned ?? 0;
+  const deposited = rowData.deposited ?? 0;
 
   // Calculated values
   const actualValue = count * value;
@@ -42,6 +44,9 @@ export default function DenominationRow({ denomination, rowData, onRowDataChange
   const returnedSuggestion = (owed > 0 && surplus > 0) ? Math.min(owed, surplus) : 0;
   const isFloatAndBorrowCorrect = Math.abs(actual + borrow - targetFloat) < 0.01;
   const showGreen = isFloatAndBorrowCorrect && borrowFieldTouched && (count > 0 || (count === 0 && borrow === targetFloat && countFieldTouched));
+  
+  // Calculate deposited amount (surplus minus returned)
+  const calculatedDeposited = Math.max(0, surplus - returned);
 
   // Helper functions
   const resetToUntouched = () => {
@@ -51,6 +56,7 @@ export default function DenominationRow({ denomination, rowData, onRowDataChange
       borrow: 0,
       returned: 0,
       owed: owed,
+      deposited: 0,
     };
   };
 
@@ -61,6 +67,7 @@ export default function DenominationRow({ denomination, rowData, onRowDataChange
       borrow: 0,
       returned: 0,
       owed: owed,
+      deposited: 0,
     };
   };
 
@@ -78,6 +85,9 @@ export default function DenominationRow({ denomination, rowData, onRowDataChange
         if (newCount === 0) {
           newRowData.borrow = targetFloat;
         }
+        // Update deposited amount when count changes
+        const newSurplus = Math.max(0, newCount - actual);
+        newRowData.deposited = Math.max(0, newSurplus - returned);
       }
     }
 
@@ -91,8 +101,12 @@ export default function DenominationRow({ denomination, rowData, onRowDataChange
         setReturnedFieldTouched(false);
         newRowData.borrow = count === 0 ? targetFloat : 0;
         newRowData.returned = 0;
+        newRowData.deposited = 0;
       } else {
         setFloatFieldTouched(true);
+        // Update deposited amount when float changes
+        const newSurplus = Math.max(0, count - newCount);
+        newRowData.deposited = Math.max(0, newSurplus - returned);
       }
     }
 
@@ -102,6 +116,8 @@ export default function DenominationRow({ denomination, rowData, onRowDataChange
       } else {
         setReturnedFieldTouched(true);
       }
+      // Update deposited amount when returned amount changes
+      newRowData.deposited = Math.max(0, surplus - newCount);
     }
 
     onRowDataChange(id, newRowData);
@@ -291,6 +307,9 @@ export default function DenominationRow({ denomination, rowData, onRowDataChange
       <View style={styles.denominationInfo}>
         <Image source={image} style={styles.image} />
         <Text style={styles.denominationLabel}>{`$${value.toFixed(2)}`}</Text>
+        <Text style={styles.remainingText}>
+          {`${calculatedDeposited} ${helperText.includes('✅') ? 'to deposit' : 'remaining'}`}
+        </Text>
       </View>
 
       {/* Dynamic Helper Text */}
@@ -428,6 +447,11 @@ const styles = StyleSheet.create({
   denominationLabel: {
     fontSize: 18,
     fontWeight: 'bold',
+  },
+  remainingText: {
+    fontSize: 14,
+    color: '#666',
+    marginLeft: 'auto',
   },
   inputsContainer: {
     flexDirection: 'row',

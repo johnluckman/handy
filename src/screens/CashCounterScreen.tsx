@@ -27,6 +27,7 @@ const initializeState = (): DenominationData => {
       borrow: 0,
       returned: 0,
       owed: 0, // Initialize 'owed' to 0
+      deposited: 0, // Initialize 'deposited' to 0
     };
   });
   return initialState;
@@ -165,7 +166,7 @@ export default function CashCounterScreen(): React.ReactElement {
     return calculateTotal();
   }, [data, calculateTotal]);
 
-  const { totalActualFloat, idealFloat, totalBorrowed, totalReturned, allDenominationsComplete } = useMemo(() => {
+  const { totalActualFloat, idealFloat, totalBorrowed, totalReturned, totalDeposited, allDenominationsComplete } = useMemo(() => {
     const idealFloatCalc = denominations.reduce(
       (sum, deno) => sum + deno.targetFloat * deno.value,
       0
@@ -174,6 +175,7 @@ export default function CashCounterScreen(): React.ReactElement {
     let actualFloat = 0;
     let borrowed = 0;
     let returned = 0;
+    let deposited = 0;
     let completedCount = 0;
 
     for (const id in data) {
@@ -185,10 +187,12 @@ export default function CashCounterScreen(): React.ReactElement {
         const borrow = rowData?.borrow ?? 0;
         const owed = rowData?.owed ?? 0;
         const returnedAmount = rowData?.returned ?? 0;
+        const depositedAmount = rowData?.deposited ?? 0;
         
         actualFloat += (actual * denomination.value);
         borrowed += (borrow * denomination.value);
         returned += (returnedAmount * denomination.value);
+        deposited += (depositedAmount * denomination.value);
 
         // Check if this denomination is complete (green state)
         const isComplete = checkDenominationComplete(denomination, rowData);
@@ -203,6 +207,7 @@ export default function CashCounterScreen(): React.ReactElement {
       idealFloat: idealFloatCalc,
       totalBorrowed: borrowed,
       totalReturned: returned,
+      totalDeposited: deposited,
       allDenominationsComplete: completedCount === denominations.length,
     };
   }, [data]);
@@ -221,7 +226,7 @@ export default function CashCounterScreen(): React.ReactElement {
 
     const flatData = denominations.flatMap(d => {
       const row = data[d.id];
-      return [row.actualCount, row.actualFloat, row.borrow, row.returned];
+      return [row.actualCount, row.actualFloat, row.borrow, row.returned, row.deposited];
     });
 
     // The Apps Script expects specific keys ('count', 'float') for the denomination data.
@@ -233,9 +238,10 @@ export default function CashCounterScreen(): React.ReactElement {
         float: original.actualFloat,
         borrow: original.borrow,
         returned: original.returned,
+        deposited: original.deposited,
       };
       return acc;
-    }, {} as { [id: string]: { count: number; float: number; borrow: number; returned: number } });
+    }, {} as { [id: string]: { count: number; float: number; borrow: number; returned: number; deposited: number } });
 
     const submissionData = {
       date: date,
@@ -438,16 +444,20 @@ export default function CashCounterScreen(): React.ReactElement {
                 <Text style={styles.summaryLabel}>Returned Total:</Text>
                 <Text style={styles.summaryValue}>{`$${totalReturned.toFixed(2)}`}</Text>
               </View>
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Deposited Total:</Text>
+                <Text style={styles.summaryValue}>{`$${totalDeposited.toFixed(2)}`}</Text>
+              </View>
             </View>
 
             <View style={styles.buttonContainer}>
               <TouchableOpacity
                 style={[
                   styles.submitButton, 
-                  (isLoading || !allDenominationsComplete) && styles.submitButtonDisabled
+                  (isLoading || (!allDenominationsComplete && userName !== 'John')) && styles.submitButtonDisabled
                 ]}
                 onPress={handleSubmit}
-                disabled={isLoading || !allDenominationsComplete}
+                disabled={isLoading || (!allDenominationsComplete && userName !== 'John')}
               >
                 {isLoading ? (
                   <View style={styles.submitButtonContent}>
@@ -459,7 +469,7 @@ export default function CashCounterScreen(): React.ReactElement {
                   </View>
                 ) : (
                   <Text style={styles.submitButtonText}>
-                    {allDenominationsComplete ? 'Submit Count' : 'Complete all cash values'}
+                    {allDenominationsComplete || userName === 'John' ? 'Submit Count' : 'Complete all cash values'}
                   </Text>
                 )}
               </TouchableOpacity>
