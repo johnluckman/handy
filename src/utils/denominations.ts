@@ -20,3 +20,25 @@ export const denominations: Denomination[] = [
   { id: '0.10', label: '10c', value: 0.10, type: 'coin', image: require('../assets/denominations/0.10.png'), targetFloat: 10 },
   { id: '0.05', label: '5c', value: 0.05, type: 'coin', image: require('../assets/denominations/0.05.png'), targetFloat: 10 },
 ]; 
+
+export function calculateTotalDeposit(row: any): number {
+  const denominationDefs = [
+    { key: '100', value: 100 },
+    { key: '50', value: 50 },
+    { key: '20', value: 20 },
+    { key: '10', value: 10 },
+    { key: '5', value: 5 },
+    { key: '2', value: 2 },
+    { key: '1', value: 1 },
+    { key: '0.50', value: 0.5 },
+    { key: '0.20', value: 0.2 },
+    { key: '0.10', value: 0.1 },
+    { key: '0.05', value: 0.05 },
+  ];
+  let total = 0;
+  denominationDefs.forEach(denom => {
+    const deposited = Number(row[`${denom.key}_Deposited`] || 0);
+    total += deposited * denom.value;
+  });
+  return total;
+} 

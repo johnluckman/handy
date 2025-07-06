@@ -11,6 +11,9 @@ import LoginScreen from '../screens/LoginScreen';
 import ProductSearchScreen from '../screens/ProductSearchScreen';
 import ProductDetailScreen from '../screens/ProductDetailScreen';
 import BarcodeScannerScreen from '../screens/BarcodeScannerScreen';
+import AdminScreen from '../screens/AdminScreen';
+import CashCheckScreen from '../screens/CashCheckScreen';
+import CashCheckDetailScreen from '../screens/CashCheckDetailScreen';
 import { Product } from '../types/Product';
 
 export type RootStackParamList = {
@@ -20,6 +23,9 @@ export type RootStackParamList = {
   ProductSearch: { initialQuery?: string };
   ProductDetail: { product: Product };
   BarcodeScanner: undefined;
+  Admin: undefined;
+  CashCheck: undefined;
+  CashCheckDetail: { row: any };
 };
 
 export type NavigationProps = StackNavigationProp<RootStackParamList>;
@@ -40,6 +46,9 @@ function AppStack() {
       <Stack.Screen name="ProductSearch" component={ProductSearchScreen} />
       <Stack.Screen name="ProductDetail" component={ProductDetailScreen} />
       <Stack.Screen name="BarcodeScanner" component={BarcodeScannerScreen} />
+      <Stack.Screen name="Admin" component={AdminScreen} />
+      <Stack.Screen name="CashCheck" component={CashCheckScreen} />
+      <Stack.Screen name="CashCheckDetail" component={CashCheckDetailScreen} />
     </Stack.Navigator>
   );
 }

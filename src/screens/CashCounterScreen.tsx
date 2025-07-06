@@ -97,11 +97,15 @@ export default function CashCounterScreen(): React.ReactElement {
       setNotes('');
 
       const owedData = await fetchOwedData(store || undefined);
+      console.log('Owed data:', owedData); // Debug log
       if (owedData && typeof owedData === 'object') {
-        // Populate the new state object with the fetched data
-        Object.entries(owedData as Record<string, number>).forEach(([id, value]) => {
-          if (newState[id]) {
-            newState[id].owed = value;
+        // Fix: Map keys like '0.05_Owing' to denomination IDs like '0.05'
+        Object.entries(owedData as Record<string, number>).forEach(([key, value]) => {
+          if (key.endsWith('_Owing')) {
+            const id = key.replace('_Owing', '');
+            if (newState[id]) {
+              newState[id].owed = value;
+            }
           }
         });
       }
@@ -219,38 +223,100 @@ export default function CashCounterScreen(): React.ReactElement {
 
   const handleSubmit = async () => {
     setIsLoading(true);
-    // Format date as yyyy-MM-dd HH:mm:ss (local time)
+    // Format date and time separately
     const now = new Date();
     const pad = (n: number) => n.toString().padStart(2, '0');
-    const date = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+    const date = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+    const time = now.toISOString(); // full ISO timestamp
 
-    const flatData = denominations.flatMap(d => {
-      const row = data[d.id];
-      return [row.actualCount, row.actualFloat, row.borrow, row.returned, row.deposited];
+    // Recalculate deposited for every denomination
+    const recalculatedData = { ...data };
+    for (const id of Object.keys(recalculatedData)) {
+      const row = recalculatedData[id];
+      row.deposited = Math.max(0, (row.actualCount || 0) - (row.actualFloat || 0) - (row.returned || 0));
+    }
+
+    // Test with some sample data to verify the structure
+    console.log('Sample data check:', {
+      '100_Count': recalculatedData['100']?.actualCount,
+      '50_Count': recalculatedData['50']?.actualCount,
+      '20_Count': recalculatedData['20']?.actualCount,
+      '10_Count': recalculatedData['10']?.actualCount,
+      '5_Count': recalculatedData['5']?.actualCount,
+      '2_Count': recalculatedData['2']?.actualCount,
+      '1_Count': recalculatedData['1']?.actualCount,
+      '0.50_Count': recalculatedData['0.50']?.actualCount,
+      '0.20_Count': recalculatedData['0.20']?.actualCount,
+      '0.10_Count': recalculatedData['0.10']?.actualCount,
+      '0.05_Count': recalculatedData['0.05']?.actualCount,
     });
-
-    // The Apps Script expects specific keys ('count', 'float') for the denomination data.
-    // We need to transform the 'data' state object to match this structure.
-    const transformedDenominations = Object.keys(data).reduce((acc, key) => {
-      const original = data[key];
-      acc[key] = {
-        count: original.actualCount,
-        float: original.actualFloat,
-        borrow: original.borrow,
-        returned: original.returned,
-        deposited: original.deposited,
-      };
-      return acc;
-    }, {} as { [id: string]: { count: number; float: number; borrow: number; returned: number; deposited: number } });
 
     const submissionData = {
       date: date,
+      time: time,
       user: userName,
       store: store,
       notes: notes,
       total: total,
-      denominations: transformedDenominations,
+      // Add individual denomination fields
+      '100_Count': recalculatedData['100']?.actualCount || 0,
+      '100_Float': recalculatedData['100']?.actualFloat || 0,
+      '100_Borrow': recalculatedData['100']?.borrow || 0,
+      '100_Returned': recalculatedData['100']?.returned || 0,
+      '100_Deposited': recalculatedData['100']?.deposited || 0,
+      '50_Count': recalculatedData['50']?.actualCount || 0,
+      '50_Float': recalculatedData['50']?.actualFloat || 0,
+      '50_Borrow': recalculatedData['50']?.borrow || 0,
+      '50_Returned': recalculatedData['50']?.returned || 0,
+      '50_Deposited': recalculatedData['50']?.deposited || 0,
+      '20_Count': recalculatedData['20']?.actualCount || 0,
+      '20_Float': recalculatedData['20']?.actualFloat || 0,
+      '20_Borrow': recalculatedData['20']?.borrow || 0,
+      '20_Returned': recalculatedData['20']?.returned || 0,
+      '20_Deposited': recalculatedData['20']?.deposited || 0,
+      '10_Count': recalculatedData['10']?.actualCount || 0,
+      '10_Float': recalculatedData['10']?.actualFloat || 0,
+      '10_Borrow': recalculatedData['10']?.borrow || 0,
+      '10_Returned': recalculatedData['10']?.returned || 0,
+      '10_Deposited': recalculatedData['10']?.deposited || 0,
+      '5_Count': recalculatedData['5']?.actualCount || 0,
+      '5_Float': recalculatedData['5']?.actualFloat || 0,
+      '5_Borrow': recalculatedData['5']?.borrow || 0,
+      '5_Returned': recalculatedData['5']?.returned || 0,
+      '5_Deposited': recalculatedData['5']?.deposited || 0,
+      '2_Count': recalculatedData['2']?.actualCount || 0,
+      '2_Float': recalculatedData['2']?.actualFloat || 0,
+      '2_Borrow': recalculatedData['2']?.borrow || 0,
+      '2_Returned': recalculatedData['2']?.returned || 0,
+      '2_Deposited': recalculatedData['2']?.deposited || 0,
+      '1_Count': recalculatedData['1']?.actualCount || 0,
+      '1_Float': recalculatedData['1']?.actualFloat || 0,
+      '1_Borrow': recalculatedData['1']?.borrow || 0,
+      '1_Returned': recalculatedData['1']?.returned || 0,
+      '1_Deposited': recalculatedData['1']?.deposited || 0,
+      '0.50_Count': recalculatedData['0.50']?.actualCount || 0,
+      '0.50_Float': recalculatedData['0.50']?.actualFloat || 0,
+      '0.50_Borrow': recalculatedData['0.50']?.borrow || 0,
+      '0.50_Returned': recalculatedData['0.50']?.returned || 0,
+      '0.50_Deposited': recalculatedData['0.50']?.deposited || 0,
+      '0.20_Count': recalculatedData['0.20']?.actualCount || 0,
+      '0.20_Float': recalculatedData['0.20']?.actualFloat || 0,
+      '0.20_Borrow': recalculatedData['0.20']?.borrow || 0,
+      '0.20_Returned': recalculatedData['0.20']?.returned || 0,
+      '0.20_Deposited': recalculatedData['0.20']?.deposited || 0,
+      '0.10_Count': recalculatedData['0.10']?.actualCount || 0,
+      '0.10_Float': recalculatedData['0.10']?.actualFloat || 0,
+      '0.10_Borrow': recalculatedData['0.10']?.borrow || 0,
+      '0.10_Returned': recalculatedData['0.10']?.returned || 0,
+      '0.10_Deposited': recalculatedData['0.10']?.deposited || 0,
+      '0.05_Count': recalculatedData['0.05']?.actualCount || 0,
+      '0.05_Float': recalculatedData['0.05']?.actualFloat || 0,
+      '0.05_Borrow': recalculatedData['0.05']?.borrow || 0,
+      '0.05_Returned': recalculatedData['0.05']?.returned || 0,
+      '0.05_Deposited': recalculatedData['0.05']?.deposited || 0,
     };
+
+    console.log('Final submission data:', JSON.stringify(submissionData, null, 2));
 
     try {
       // 1. Add to storage
@@ -472,6 +538,13 @@ export default function CashCounterScreen(): React.ReactElement {
                     {allDenominationsComplete || userName === 'John' ? 'Submit Count' : 'Complete all cash values'}
                   </Text>
                 )}
+              </TouchableOpacity>
+              {/* Admin Button */}
+              <TouchableOpacity
+                style={[styles.submitButton, { marginTop: 10, backgroundColor: '#888' }]}
+                onPress={() => navigation.navigate('Admin')}
+              >
+                <Text style={styles.submitButtonText}>Admin</Text>
               </TouchableOpacity>
             </View>
           </View>

@@ -81,13 +81,10 @@ export default function DenominationRow({ denomination, rowData, onRowDataChange
         newRowData = resetToUntouched();
       } else {
         newRowData = clearOtherFields(newCount);
-        // If count is 0 and user has touched the field, set borrow to target float
         if (newCount === 0) {
           newRowData.borrow = targetFloat;
         }
-        // Update deposited amount when count changes
-        const newSurplus = Math.max(0, newCount - actual);
-        newRowData.deposited = Math.max(0, newSurplus - returned);
+        newRowData.deposited = Math.max(0, newRowData.actualCount - newRowData.actualFloat - newRowData.returned);
       }
     }
 
@@ -104,9 +101,7 @@ export default function DenominationRow({ denomination, rowData, onRowDataChange
         newRowData.deposited = 0;
       } else {
         setFloatFieldTouched(true);
-        // Update deposited amount when float changes
-        const newSurplus = Math.max(0, count - newCount);
-        newRowData.deposited = Math.max(0, newSurplus - returned);
+        newRowData.deposited = Math.max(0, newRowData.actualCount - newRowData.actualFloat - newRowData.returned);
       }
     }
 
@@ -116,8 +111,7 @@ export default function DenominationRow({ denomination, rowData, onRowDataChange
       } else {
         setReturnedFieldTouched(true);
       }
-      // Update deposited amount when returned amount changes
-      newRowData.deposited = Math.max(0, surplus - newCount);
+      newRowData.deposited = Math.max(0, newRowData.actualCount - newRowData.actualFloat - newRowData.returned);
     }
 
     onRowDataChange(id, newRowData);

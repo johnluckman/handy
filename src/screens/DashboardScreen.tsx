@@ -5,6 +5,9 @@ import { NavigationProps } from '../navigation/AppNavigator';
 import { useAuth } from '../context/AuthContext';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
+// Admin users who can access Top Up functionality
+const ADMIN_USERS = ['John', 'john'];
+
 const tools = [
   { id: '1', name: 'Cash Counter', icon: 'cash-register' },
   { id: '2', name: 'Product Search', icon: 'magnify' },
@@ -21,11 +24,28 @@ export default function DashboardScreen(): React.ReactElement {
   const navigation = useNavigation<NavigationProps>();
   const { user, store, logout } = useAuth();
 
+  // Check if current user is an admin
+  const isAdmin = user && ADMIN_USERS.includes(user);
+
+  // Get tools array with conditional admin tools
+  const getTools = () => {
+    const baseTools = [...tools];
+    if (isAdmin) {
+      baseTools.push({ id: 'topup', name: 'Top Up', icon: 'plus-circle' });
+      baseTools.push({ id: 'cashcheck', name: 'Cash Check', icon: 'clipboard-check' });
+    }
+    return baseTools;
+  };
+
   const handlePress = (toolName: string) => {
     if (toolName === 'Cash Counter') {
       navigation.navigate('CashCounter');
     } else if (toolName === 'Product Search') {
       navigation.navigate('ProductSearch', {});
+    } else if (toolName === 'Top Up') {
+      navigation.navigate('Admin');
+    } else if (toolName === 'Cash Check') {
+      navigation.navigate('CashCheck');
     }
     // Add navigation for other tools here
   };
@@ -51,7 +71,7 @@ export default function DashboardScreen(): React.ReactElement {
       </View>
       <Text style={styles.title}>Handy</Text>
       <FlatList
-        data={tools}
+        data={getTools()}
         renderItem={renderTool}
         keyExtractor={(item) => item.id}
         numColumns={2}

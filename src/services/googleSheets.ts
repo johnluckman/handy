@@ -145,4 +145,116 @@ export async function fetchOwedData(store?: string) {
   }
 }
 
+/**
+ * Fetches the Top-up sheet data from Google Sheets via Apps Script.
+ * Returns an array of objects with keys matching the Top-up sheet headers.
+ */
+export async function fetchTopUpSheet() {
+  try {
+    if (!EXPO_PUBLIC_APPS_SCRIPT_URL) {
+      console.warn('⚠️ Google Apps Script URL not configured. Please set EXPO_PUBLIC_APPS_SCRIPT_URL in your .env file');
+      return [];
+    }
+    const url = new URL(EXPO_PUBLIC_APPS_SCRIPT_URL);
+    url.searchParams.set('action', 'fetchTopUp');
+    const response = await fetch(url.toString(), {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' },
+    });
+    if (!response.ok) {
+      console.error('❌ Failed to fetch Top-up sheet:', response.status, response.statusText);
+      return [];
+    }
+    const responseText = await response.text();
+    console.log('📊 Raw Top-up response:', responseText);
+    
+    let data;
+    try {
+      data = JSON.parse(responseText);
+    } catch (jsonError) {
+      console.error('❌ Response was not valid JSON:', responseText);
+      return [];
+    }
+    
+    if (data.success && Array.isArray(data.rows)) {
+      return data.rows;
+    } else {
+      console.warn('⚠️ No Top-up data returned or fetch failed:', data);
+      return [];
+    }
+  } catch (error) {
+    console.error('❌ Error fetching Top-up data:', error);
+    return [];
+  }
+}
+
+/**
+ * Fetches the Log sheet data from Google Sheets via Apps Script.
+ * Returns an array of objects with keys matching the Log sheet headers.
+ * @param {string} [store] - Optional store filter (e.g., 'Newtown' or 'Paddington')
+ */
+export async function fetchLogSheet(store?: string) {
+  try {
+    if (!EXPO_PUBLIC_APPS_SCRIPT_URL) {
+      console.warn('⚠️ Google Apps Script URL not configured. Please set EXPO_PUBLIC_APPS_SCRIPT_URL in your .env file');
+      return [];
+    }
+    const url = new URL(EXPO_PUBLIC_APPS_SCRIPT_URL);
+    url.searchParams.set('action', 'fetchLog');
+    if (store) url.searchParams.set('store', store);
+    
+    console.log('🔍 Fetching Log data for store:', store || 'all');
+    
+    const response = await fetch(url.toString(), {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' },
+    });
+    
+    if (!response.ok) {
+      console.error('❌ Failed to fetch Log sheet:', response.status, response.statusText);
+      return [];
+    }
+    
+    const responseText = await response.text();
+    console.log('📊 Raw response:', responseText);
+    
+    let data;
+    try {
+      data = JSON.parse(responseText);
+    } catch (jsonError) {
+      console.error('❌ Response was not valid JSON:', responseText);
+      return [];
+    }
+    
+    console.log('📊 Log data response:', data);
+    
+    if (data.success && Array.isArray(data.rows)) {
+      console.log(`✅ Fetched ${data.rows.length} rows from Log sheet`);
+      return data.rows;
+    } else {
+      console.warn('⚠️ No Log data returned or fetch failed:', data);
+      return [];
+    }
+  } catch (error) {
+    console.error('❌ Error fetching Log data:', error);
+    return [];
+  }
+}
+
+export async function updateCheckedFields(time: any, updatedFields: any) {
+  if (!EXPO_PUBLIC_APPS_SCRIPT_URL) {
+    throw new Error('Google Apps Script URL not configured');
+  }
+  const response = await fetch(EXPO_PUBLIC_APPS_SCRIPT_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      action: 'updateChecked',
+      time,
+      updatedFields,
+    }),
+  });
+  return await response.json();
+}
+
 // The old testConnection function has been removed as it was obsolete. 
