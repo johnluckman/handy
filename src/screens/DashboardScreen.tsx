@@ -42,6 +42,8 @@ export default function DashboardScreen(): React.ReactElement {
       navigation.navigate('CashCounter');
     } else if (toolName === 'Product Search') {
       navigation.navigate('ProductSearch', {});
+    } else if (toolName === 'Restocker') {
+      navigation.navigate('Restocker');
     } else if (toolName === 'Top Up') {
       navigation.navigate('Admin');
     } else if (toolName === 'Cash Check') {
