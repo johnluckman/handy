@@ -1,3 +1,20 @@
+/**
+ * CIN7 PRODUCTS SYNC - SYNC PRODUCTS FROM CIN7 TO SUPABASE
+ * ========================================================
+ * 
+ * This script fetches all products from the Cin7 API and syncs them to the
+ * Supabase database. It handles product options and creates individual records
+ * for each product variant.
+ * 
+ * Features:
+ * - Paginated API calls to Cin7 (250 products per page)
+ * - Handles product options and variants
+ * - Upserts data to avoid duplicates
+ * - Maps all product fields from Cin7 to Supabase schema
+ * 
+ * Usage: node scripts/syncCin7ProductsToSupabase.js
+ */
+
 import 'dotenv/config';
 import fetch from 'node-fetch';
 import { createClient } from '@supabase/supabase-js';

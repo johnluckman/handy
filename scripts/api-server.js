@@ -1,3 +1,19 @@
+/**
+ * API SERVER - EXPRESS SERVER FOR RUNNING SYNC SCRIPTS
+ * ===================================================
+ * 
+ * This script provides a REST API server that can trigger various sync operations
+ * by running the corresponding sync scripts as child processes. It includes
+ * endpoints for stock sync and product sync operations.
+ * 
+ * Endpoints:
+ * - GET /api/health - Health check
+ * - POST /api/syncStock - Triggers stock sync script
+ * - POST /api/syncCin7 - Triggers product sync script
+ * 
+ * Usage: node scripts/api-server.js
+ */
+
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';

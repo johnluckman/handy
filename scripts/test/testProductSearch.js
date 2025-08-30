@@ -1,3 +1,20 @@
+/**
+ * PRODUCT SEARCH TEST - TEST BASIC PRODUCT SEARCH AND QUERYING
+ * ===========================================================
+ * 
+ * This test script validates basic product search functionality in the Supabase
+ * database. It tests various search queries and displays sample product data
+ * to verify the database connection and data integrity.
+ * 
+ * Features:
+ * - Tests product count retrieval
+ * - Searches products by name and code
+ * - Displays sample product information
+ * - Validates database connectivity
+ * 
+ * Usage: node scripts/test/testProductSearch.js
+ */
+
 import 'dotenv/config';
 import { createClient } from '@supabase/supabase-js';
 

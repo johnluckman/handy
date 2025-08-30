@@ -1,3 +1,20 @@
+/**
+ * PRODUCT CONTEXT TEST - TEST PRODUCT SEARCH FUNCTIONALITY
+ * =======================================================
+ * 
+ * This test script validates the ProductContext search functionality by testing
+ * the searchRecords function with various queries and filters. It simulates
+ * how the React Native app searches for products in the database.
+ * 
+ * Features:
+ * - Tests product search by name, code, and barcode
+ * - Validates search filters and pagination
+ * - Tests empty query handling
+ * - Simulates ProductContext search behavior
+ * 
+ * Usage: node scripts/test/testProductContext.js
+ */
+
 import 'dotenv/config';
 import { createClient } from '@supabase/supabase-js';
 

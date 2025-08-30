@@ -1,3 +1,20 @@
+/**
+ * CIN7 STOCK SYNC - SYNC STOCK LEVELS FROM CIN7 TO SUPABASE
+ * =========================================================
+ * 
+ * This script fetches stock information for all products from the Cin7 API
+ * and syncs it to the Supabase stock table. It creates stock records for
+ * each product variant at each branch location.
+ * 
+ * Features:
+ * - Fetches all products first, then gets stock for each
+ * - Handles multiple branches and product variants
+ * - Upserts stock data to avoid duplicates
+ * - Maps stock fields: available, stockOnHand, openSales, incoming, etc.
+ * 
+ * Usage: node scripts/syncCin7StockToSupabase.js
+ */
+
 import 'dotenv/config';
 import fetch from 'node-fetch';
 import { createClient } from '@supabase/supabase-js';

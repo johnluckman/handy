@@ -1,3 +1,20 @@
+/**
+ * CIN7 API TEST - TEST CIN7 API CREDENTIALS AND CONNECTIVITY
+ * ==========================================================
+ * 
+ * This test script verifies that the Cin7 API credentials are working correctly
+ * by making a simple API call to fetch one product. It helps diagnose
+ * authentication and connectivity issues.
+ * 
+ * Features:
+ * - Tests API credentials (username/api key)
+ * - Makes a minimal API call to /Products endpoint
+ * - Provides clear feedback on success/failure
+ * - Helps troubleshoot authentication issues
+ * 
+ * Usage: node scripts/test/check-cin7-api.js
+ */
+
 require('dotenv').config();
 const https = require('https');
 
