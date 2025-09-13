@@ -19,6 +19,7 @@ function AppContent() {
     'Inter-Regular': require('./src/assets/fonts/Inter-Regular.ttf'),
     'Inter-SemiBold': require('./src/assets/fonts/Inter-SemiBold.ttf'),
     'Inter-Bold': require('./src/assets/fonts/Inter-Bold.ttf'),
+    'MaterialCommunityIcons': require('react-native-vector-icons/Fonts/MaterialCommunityIcons.ttf'),
   });
 
   const [fontTimeout, setFontTimeout] = useState(false);

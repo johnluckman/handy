@@ -30,7 +30,11 @@
       "favicon": "./src/assets/favicon.png",
       "bundler": "metro"
     },
-    "platforms": ["ios", "android", "web"],
+    "platforms": [
+      "ios",
+      "android",
+      "web"
+    ],
     "extra": {
       "eas": {
         "projectId": "cc5f4911-bb5a-4ba6-9318-ba23fa656eb8"
@@ -43,6 +47,19 @@
     },
     "runtimeVersion": {
       "policy": "sdkVersion"
-    }
+    },
+    "plugins": [
+      [
+        "expo-font",
+        {
+          "fonts": [
+            "./src/assets/fonts/Inter-Regular.ttf",
+            "./src/assets/fonts/Inter-SemiBold.ttf",
+            "./src/assets/fonts/Inter-Bold.ttf",
+            "./node_modules/react-native-vector-icons/Fonts/MaterialCommunityIcons.ttf"
+          ]
+        }
+      ]
+    ]
   }
-} 
+}
