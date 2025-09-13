@@ -43,7 +43,7 @@ export default function DashboardScreen(): React.ReactElement {
     } else if (toolName === 'Product Search') {
       navigation.navigate('ProductSearch', {});
     } else if (toolName === 'Restocker') {
-      navigation.navigate('Restocker');
+      navigation.navigate('Restocker', { location: store?.toLowerCase() || 'newtown' });
     } else if (toolName === 'Top Up') {
       navigation.navigate('Admin');
     } else if (toolName === 'Cash Check') {

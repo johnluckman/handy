@@ -12,8 +12,12 @@
  * - Rate limiting (500ms between API calls)
  * - Handles both Sales and SalesOrders endpoints
  * - Maps sales data to Supabase schema
+ * - Location-based filtering (279 for Newtown, 255c for Paddington)
  * 
- * Usage: node scripts/syncCin7SalesToSupabase.js
+ * Usage: 
+ *   node scripts/syncCin7SalesToSupabase.js
+ *   node scripts/syncCin7SalesToSupabase.js --location=newtown
+ *   node scripts/syncCin7SalesToSupabase.js --location=paddington
  */
 
 import 'dotenv/config';
@@ -32,6 +36,21 @@ if (!SUPABASE_URL || !SUPABASE_ANON_KEY || !CIN7_API_URL || !CIN7_USERNAME || !C
 }
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// Parse command line arguments for location filtering
+const args = process.argv.slice(2);
+let targetLocation = null;
+let locationCode = null;
+
+for (const arg of args) {
+  if (arg.startsWith('--location=')) {
+    targetLocation = arg.split('=')[1];
+    locationCode = targetLocation === 'newtown' ? '279' : targetLocation === 'paddington' ? '255c' : null;
+    if (locationCode) {
+      console.log(`📍 Location filtering enabled: ${targetLocation} (${locationCode})`);
+    }
+  }
+}
 
 // Rate limiting helper
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
@@ -59,10 +78,15 @@ async function fetchSalesData(date = new Date()) {
   console.log(`📊 Fetching sales data for ${dateString}...`);
   
   try {
+    // Try different date filtering approaches
     const endpoints = [
-      `${CIN7_API_URL}/Sales?page=1&rows=250&dateFrom=${dateString}&dateTo=${dateString}`,
-      `${CIN7_API_URL}/SalesOrders?page=1&rows=250&dateFrom=${dateString}&dateTo=${dateString}`,
-      `${CIN7_API_URL}/v1/SalesOrders?page=1&rows=250&dateFrom=${dateString}&dateTo=${dateString}`
+      // Try with explicit date filtering
+      `${CIN7_API_URL}/Sales?page=1&rows=100&dateFrom=${dateString}&dateTo=${dateString}`,
+      `${CIN7_API_URL}/SalesOrders?page=1&rows=100&dateFrom=${dateString}&dateTo=${dateString}`,
+      `${CIN7_API_URL}/v1/SalesOrders?page=1&rows=100&dateFrom=${dateString}&dateTo=${dateString}`,
+      // Fallback: try without date filtering but with smaller page size
+      `${CIN7_API_URL}/v1/SalesOrders?page=1&rows=50`,
+      `${CIN7_API_URL}/SalesOrders?page=1&rows=50`
     ];
     
     const headers = {
@@ -81,7 +105,11 @@ async function fetchSalesData(date = new Date()) {
           const data = await res.json();
           allSales = Array.isArray(data) ? data : data.Sales || data.SalesOrders || [];
           console.log(`✅ Found ${allSales.length} sales using: ${url}`);
-          break;
+          
+          // If we got data, break and filter it client-side
+          if (allSales.length > 0) {
+            break;
+          }
         }
       } catch (error) {
         console.log(`❌ Failed: ${url}`);
@@ -93,7 +121,56 @@ async function fetchSalesData(date = new Date()) {
       return [];
     }
     
-    return allSales;
+    // Client-side date filtering as backup
+    console.log(`🔍 Filtering ${allSales.length} sales by date ${dateString}...`);
+    const filteredSales = allSales.filter(sale => {
+      // Try different date fields that might exist
+      const saleDate = sale.createdDate || sale.CreatedDate || sale.created_date || sale.date;
+      if (!saleDate) {
+        console.log(`⚠️  Sale ${sale.id} has no date field`);
+        return false;
+      }
+      
+      // Convert to date and check if it matches today
+      const saleDateObj = new Date(saleDate);
+      const saleDateString = saleDateObj.toISOString().split('T')[0];
+      const matches = saleDateString === dateString;
+      
+      if (!matches) {
+        console.log(`⚠️  Sale ${sale.id} date: ${saleDateString} (expected: ${dateString})`);
+      }
+      
+      return matches;
+    });
+    
+    console.log(`✅ Filtered to ${filteredSales.length} sales for ${dateString}`);
+    
+    // Apply location filtering if specified
+    if (locationCode) {
+      console.log(`📍 Filtering sales by location code: ${locationCode}`);
+      const locationFilteredSales = filteredSales.filter(sale => {
+        // Check if the sale reference starts with the location code
+        const saleRef = sale.reference || sale.Reference || sale.referenceNumber || sale.ReferenceNumber;
+        if (!saleRef) {
+          console.log(`⚠️  Sale ${sale.id} has no reference field`);
+          return false;
+        }
+        
+        const saleLocation = saleRef.split('-')[0];
+        const matches = saleLocation === locationCode;
+        
+        if (!matches) {
+          console.log(`⚠️  Sale ${sale.id} location: ${saleLocation} (expected: ${locationCode})`);
+        }
+        
+        return matches;
+      });
+      
+      console.log(`📍 Location filtered to ${locationFilteredSales.length} sales for ${targetLocation} (${locationCode})`);
+      return locationFilteredSales;
+    }
+    
+    return filteredSales;
     
   } catch (error) {
     console.error(`❌ Error fetching sales:`, error);

@@ -1,542 +1,847 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
   StyleSheet,
+  ScrollView,
   TouchableOpacity,
   FlatList,
-  ActivityIndicator,
+  RefreshControl,
   Alert,
-  ScrollView,
-  LogBox,
+  ActivityIndicator,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
-import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
-import { NavigationProps } from '../navigation/AppNavigator';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
+import { createRestockService, RestockItem, RestockData } from '../services/restockService';
+import { supabase } from '../services/supabase';
 
-// Suppress the specific warning about text strings
+// Suppress React Native warning
+import { LogBox } from 'react-native';
 LogBox.ignoreLogs(['Text strings must be rendered within a <Text> component']);
 
-interface RestockItem {
-  id: string;
-  sku: string;
-  productName: string;
-  instock: number;
-  quantity: number;
-  sold?: number;
-  picked?: number;
-  review?: number;
+interface RestockerScreenProps {
+  route: {
+    params: {
+      location: 'newtown' | 'paddington';
+    };
+  };
 }
 
-interface RestockData {
-  items: RestockItem[];
-  totalSold: number;
-  totalPicked: number;
-  totalReview: number;
-}
+export default function RestockerScreen({ route }: RestockerScreenProps) {
+  const { location = 'newtown' } = route.params || {};
+  const [activeTab, setActiveTab] = useState('restock');
+  const [restockData, setRestockData] = useState<RestockData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [updatingItem, setUpdatingItem] = useState<string | null>(null);
 
-export default function RestockerScreen(): React.ReactElement {
-  const navigation = useNavigation<NavigationProps>();
-  
-  const [activeTab, setActiveTab] = useState<'restock' | 'online' | 'review' | 'settings'>('restock');
-  const [restockItems, setRestockItems] = useState<RestockItem[]>([
-    { id: '1', sku: 'JEL-BASS6BN', productName: 'Product Name 1', instock: 13, quantity: 2, sold: 13 },
-    { id: '2', sku: '1FY-INC-1300', productName: 'Product Name 2', instock: 13, quantity: 1, sold: 0 },
-  ]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [syncResults, setSyncResults] = useState<string[]>([]);
+  const restockService = useMemo(() => createRestockService(location), [location]);
 
-  const handleQuantityChange = (id: string, change: number) => {
-    setRestockItems(prev => 
-      prev.map(item => 
-        item.id === id 
-          ? { ...item, quantity: Math.max(0, item.quantity + change) }
-          : item
-      )
-    );
+  const loadRestockData = useCallback(async () => {
+    try {
+      setLoading(true);
+      // Only fetch items that need restocking (sold > 0)
+      const items = await restockService.fetchItemsNeedingRestock();
+      
+      // Calculate totals for summary stats
+      const totalSold = items.reduce((sum: number, item: RestockItem) => sum + (item.sold || 0), 0);
+      const totalPicked = items.reduce((sum: number, item: RestockItem) => sum + (item.picked || 0), 0);
+      const totalReview = items.reduce((sum: number, item: RestockItem) => sum + (item.review || 0), 0);
+      const totalMissing = items.reduce((sum: number, item: RestockItem) => sum + (item.missing || 0), 0);
+      
+      const data = {
+        items,
+        totalSold,
+        totalPicked,
+        totalReview,
+        totalMissing
+      };
+      
+      console.log(`📊 Loaded ${items.length} items that need restocking`);
+      setRestockData(data);
+    } catch (error) {
+      console.error('Error loading restock data:', error);
+      Alert.alert('Error', 'Failed to load restock data');
+    } finally {
+      setLoading(false);
+    }
+  }, [restockService]);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await loadRestockData();
+    setRefreshing(false);
+  }, [loadRestockData]);
+
+  useEffect(() => {
+    loadRestockData();
+  }, [loadRestockData]);
+
+  const handleIncrementPicked = async (itemId: string) => {
+    try {
+      setUpdatingItem(itemId);
+      await restockService.incrementPicked(itemId);
+      await loadRestockData(); // Refresh data
+      Alert.alert('Success', 'Picked count updated');
+    } catch (error) {
+      console.error('Error incrementing picked:', error);
+      Alert.alert('Error', 'Failed to update picked count');
+    } finally {
+      setUpdatingItem(null);
+    }
   };
 
-  const handleSync = async (type: string) => {
-    setIsLoading(true);
-    setSyncResults(prev => [...prev, `Starting ${type} sync...`]);
-    
-    // Simulate sync process
-    setTimeout(() => {
-      setSyncResults(prev => [...prev, `${type} sync completed successfully!`]);
-      setIsLoading(false);
-    }, 2000);
+  const handleMarkAsReviewed = async (itemId: string) => {
+    try {
+      setUpdatingItem(itemId);
+      await restockService.markAsReviewed(itemId);
+      await loadRestockData(); // Refresh data
+      Alert.alert('Success', 'Item marked as reviewed');
+    } catch (error) {
+      console.error('Error marking as reviewed:', error);
+      Alert.alert('Error', 'Failed to mark item as reviewed');
+    } finally {
+      setUpdatingItem(null);
+    }
   };
 
-  const renderRestockItem = ({ item }: { item: RestockItem }) => (
-    <View style={styles.item}>
-      {/* Left: Image placeholder */}
-      <View style={styles.itemImageContainer}>
-        <View style={styles.itemImagePlaceholder}>
-          <Icon name="image" size={24} color="#999" />
-        </View>
-      </View>
-      
-      {/* Middle: Product details */}
-      <View style={styles.itemDetails}>
-        <Text style={styles.itemSku}>SKU</Text>
-        <Text style={styles.itemName}>{item.sku}</Text>
-        <Text style={styles.itemName}>Product Name</Text>
-        <Text style={styles.itemName}>{item.productName}</Text>
-        <Text style={styles.itemInstock}>Instock: {item.instock}</Text>
-        {item.sold && item.sold > 0 && (
-          <Text style={styles.itemSold}>Sold today: {item.sold}</Text>
-        )}
-      </View>
-      
-      {/* Right: Quantity and controls */}
-      <View style={styles.itemQuantity}>
-        <Text style={styles.quantityNumber}>{item.quantity}</Text>
-        <View style={styles.quantityControls}>
-          <TouchableOpacity 
-            style={styles.quantityButton}
-            onPress={() => handleQuantityChange(item.id, -1)}
-          >
-            <Icon name="minus" size={16} color="#333" />
-          </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={styles.quantityButton}
-            onPress={() => handleQuantityChange(item.id, 1)}
-          >
-            <Icon name="plus" size={16} color="#333" />
-          </TouchableOpacity>
-        </View>
-      </View>
-    </View>
-  );
+  const handleMarkAsStoreroomEmpty = async (itemId: string) => {
+    try {
+      setUpdatingItem(itemId);
+      await restockService.markAsStoreroomEmpty(itemId);
+      await loadRestockData(); // Refresh data
+      Alert.alert('Success', 'Item marked as storeroom empty');
+    } catch (error) {
+      console.error('Error marking as storeroom empty:', error);
+      Alert.alert('Error', 'Failed to mark item as storeroom empty');
+    } finally {
+      setUpdatingItem(null);
+    }
+  };
 
-  const renderOnlineTab = () => (
-    <View style={styles.tabPlaceholder}>
-      <Icon name="shopping" size={64} color="#999" />
-      <Text style={styles.tabPlaceholderText}>Online Orders</Text>
-      <Text style={styles.tabPlaceholderSubtext}>
-        Manage online order picking and fulfillment
-              </Text>
+  const handleMarkAsMissing = async (itemId: string) => {
+    try {
+      setUpdatingItem(itemId);
+      await restockService.markAsMissing(itemId);
+      await loadRestockData(); // Refresh data
+      Alert.alert('Success', 'Item marked as missing');
+    } catch (error) {
+      console.error('Error marking as missing:', error);
+      Alert.alert('Error', 'Failed to mark item as missing');
+    } finally {
+      setUpdatingItem(null);
+    }
+  };
+
+  const handleSyncSales = async () => {
+    try {
+      Alert.alert(
+        'Restock Sales Sync',
+        `This will sync today's sales from Cin7 and update restock quantities for ${location}. Continue?`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { 
+            text: 'Show Command', 
+            style: 'default',
+            onPress: async () => {
+              console.log(`🚀 Starting restock sales sync for ${location}...`);
+              console.log(`📦 Command to run: node scripts/restockSalesSync.js --location=${location}`);
+              console.log(`📊 This will:`);
+              console.log(`   - Sync today's sales from Cin7 to Supabase`);
+              console.log(`   - Filter sales by location (${location === 'newtown' ? '279' : '255c'})`);
+              console.log(`   - Update sold quantities in restock_${location} table`);
+              console.log(`   - Process only location-specific sales data`);
+              console.log(`✅ Sales sync command logged to terminal`);
+              
+              Alert.alert(
+                'Sales Sync Command', 
+                `Sales sync command logged to terminal.\n\nTo run the actual sync:\n\nnode scripts/restockSalesSync.js --location=${location}\n\nThis will sync today's sales and update restock quantities for ${location} only.`
+              );
+            }
+          }
+        ]
+      );
+    } catch (error) {
+      console.error('Error syncing sales:', error);
+      Alert.alert('Error', 'Failed to sync sales data');
+    }
+  };
+
+  const handleClearRestockTable = async () => {
+    try {
+      Alert.alert(
+        'Reset Restock Quantities',
+        `This will reset all sold, picked, returned, review, storeroom_empty, and missing quantities to 0 for ${location}. Product records will remain intact. Continue?`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { 
+            text: 'Reset', 
+            style: 'default',
+            onPress: async () => {
+              try {
+                // Reset all quantity fields to 0 but keep product records
+                const { error } = await supabase
+                  .from(`restock_${location}`)
+                  .update({
+                    sold: 0,
+                    returned: 0,
+                    picked: 0,
+                    review: 0,
+                    storeroom_empty: 0,
+                    missing: 0,
+                    last_updated: new Date().toISOString()
+                  })
+                  .gte('id', 0);
+                
+                if (error) throw error;
+                
+                Alert.alert('Success', `Restock quantities reset successfully for ${location}`);
+                await loadRestockData(); // Refresh data
+              } catch (error) {
+                console.error('Error resetting restock quantities:', error);
+                Alert.alert('Error', 'Failed to reset restock quantities');
+              }
+            }
+          }
+        ]
+      );
+    } catch (error) {
+      console.error('Error resetting restock quantities:', error);
+      Alert.alert('Error', 'Failed to reset restock quantities');
+    }
+  };
+
+  const handleClearSalesData = async () => {
+    try {
+      Alert.alert(
+        'Clear Sales Data',
+        'This will clear all data from the sales and sale_items tables. This action cannot be undone. Continue?',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { 
+            text: 'Clear', 
+            style: 'destructive',
+            onPress: async () => {
+              try {
+                // Clear sale_items first (due to foreign key constraints)
+                const { error: itemsError } = await supabase
+                  .from('sale_items')
+                  .delete()
+                  .gte('id', 0);
+                
+                if (itemsError) throw itemsError;
+                
+                // Then clear sales
+                const { error: salesError } = await supabase
+                  .from('sales')
+                  .delete()
+                  .gte('id', 0);
+                
+                if (salesError) throw salesError;
+                
+                Alert.alert('Success', 'Sales data cleared successfully');
+              } catch (error) {
+                console.error('Error clearing sales data:', error);
+                Alert.alert('Error', 'Failed to clear sales data');
+              }
+            }
+          }
+        ]
+      );
+    } catch (error) {
+      console.error('Error clearing sales data:', error);
+      Alert.alert('Error', 'Failed to clear sales data');
+    }
+  };
+
+  const handleRestockProductSync = async () => {
+    try {
+      Alert.alert(
+        'Sync Product Data',
+        `This will sync product data from the products database to the restock_${location} table. This will overwrite existing product data. Continue?`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { 
+            text: 'Sync', 
+            style: 'default',
+            onPress: async () => {
+              try {
+                console.log(`🚀 Starting product sync for ${location}...`);
+                console.log(`📦 Command to run: node scripts/restockProductSync.js --location=${location}`);
+                console.log(`📊 This will populate the restock_${location} table with product data`);
+                console.log(`🔄 The script will:`);
+                console.log(`   - Fetch products from the products database`);
+                console.log(`   - Create restock records in restock_${location}`);
+                console.log(`   - Map: id, product_id, option_product_id, productOptionCode, name, option1, option2, option3`);
+                console.log(`   - Initialize all quantity fields to 0`);
+                console.log(`   - Set last_updated timestamp`);
+                console.log(`✅ Product sync information logged to terminal`);
+                
+                // Show progress alert
+                Alert.alert(
+                  'Product Sync Info', 
+                  `Product sync details logged to terminal.\n\nTo run the actual sync:\n\nnode scripts/restockProductSync.js --location=${location}`
+                );
+                
+              } catch (error) {
+                console.error('Error syncing products:', error);
+                Alert.alert('Error', 'Failed to sync product data');
+              }
+            }
+          }
+        ]
+      );
+    } catch (error) {
+      console.error('Error syncing products:', error);
+      Alert.alert('Error', 'Failed to sync product data');
+    }
+  };
+
+  const renderRestockItem = ({ item }: { item: RestockItem }) => {
+    const needsRestock = item.sold > item.picked;
+    const isInReview = item.review === 1;
+    const isStoreroomEmpty = item.storeroom_empty === 1;
+    const isMissing = item.missing === 1;
+
+    return (
+      <View style={styles.itemCard}>
+        <View style={styles.itemHeader}>
+          <Text style={styles.itemName} numberOfLines={2}>
+            {item.name}
+          </Text>
+          <Text style={styles.itemSku}>{item.productOptionCode}</Text>
+        </View>
+
+        <View style={styles.itemDetails}>
+          <View style={styles.quantityRow}>
+            <Text style={styles.quantityLabel}>Sold:</Text>
+            <Text style={[styles.quantityValue, styles.soldQuantity]}>{item.sold}</Text>
           </View>
-  );
+          
+          <View style={styles.quantityRow}>
+            <Text style={styles.quantityLabel}>Picked:</Text>
+            <Text style={[styles.quantityValue, styles.pickedQuantity]}>{item.picked}</Text>
+            {needsRestock && (
+              <TouchableOpacity
+                style={styles.incrementButton}
+                onPress={() => handleIncrementPicked(item.id)}
+                disabled={updatingItem === item.id}
+              >
+                {updatingItem === item.id ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Ionicons name="add" size={16} color="#fff" />
+                )}
+              </TouchableOpacity>
+            )}
+          </View>
 
-  const renderReviewTab = () => (
-    <View style={styles.tabPlaceholder}>
-      <Icon name="clipboard-check" size={64} color="#999" />
-      <Text style={styles.tabPlaceholderText}>Review & Quality</Text>
-      <Text style={styles.tabPlaceholderSubtext}>
-        Review picked items and quality checks
-          </Text>
+          {item.option1 && (
+            <Text style={styles.itemOption}>Option: {item.option1}</Text>
+          )}
+        </View>
+
+        <View style={styles.statusRow}>
+          {isInReview && (
+            <View style={[styles.statusBadge, styles.reviewBadge]}>
+              <Text style={styles.statusText}>Review</Text>
+            </View>
+          )}
+          {isStoreroomEmpty && (
+            <View style={[styles.statusBadge, styles.storeroomBadge]}>
+              <Text style={styles.statusText}>Storeroom Empty</Text>
+            </View>
+          )}
+          {isMissing && (
+            <View style={[styles.statusBadge, styles.missingBadge]}>
+              <Text style={styles.statusText}>Missing</Text>
+            </View>
+          )}
+        </View>
+
+        <View style={styles.actionRow}>
+          {!isInReview && !isStoreroomEmpty && !isMissing && (
+            <TouchableOpacity
+              style={[styles.actionButton, styles.reviewButton]}
+              onPress={() => handleMarkAsReviewed(item.id)}
+              disabled={updatingItem === item.id}
+            >
+              <Text style={styles.actionButtonText}>Mark Review</Text>
+            </TouchableOpacity>
+          )}
+          
+          {!isStoreroomEmpty && (
+            <TouchableOpacity
+              style={[styles.actionButton, styles.storeroomButton]}
+              onPress={() => handleMarkAsStoreroomEmpty(item.id)}
+              disabled={updatingItem === item.id}
+            >
+              <Text style={styles.actionButtonText}>Storeroom Empty</Text>
+            </TouchableOpacity>
+          )}
+          
+          {!isMissing && (
+            <TouchableOpacity
+              style={[styles.actionButton, styles.missingButton]}
+              onPress={() => handleMarkAsMissing(item.id)}
+              disabled={updatingItem === item.id}
+            >
+              <Text style={styles.actionButtonText}>Mark Missing</Text>
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
     );
-
-  const renderSettingsTab = () => (
-    <ScrollView style={styles.settingsContainer}>
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Data Synchronization</Text>
-        
-        <TouchableOpacity 
-          style={styles.syncButton}
-          onPress={() => handleSync('Sales Data')}
-          disabled={isLoading}
-        >
-          <Icon name="sync" size={20} color="white" />
-          <Text style={styles.syncButtonText}>Sync Sales Data</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity 
-          style={styles.syncButton}
-          onPress={() => handleSync('Stock Levels')}
-          disabled={isLoading}
-        >
-          <Icon name="package-variant" size={20} color="white" />
-          <Text style={styles.syncButtonText}>Sync Stock Levels</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity 
-          style={styles.syncButton}
-          onPress={() => handleSync('Product Data')}
-          disabled={isLoading}
-        >
-          <Icon name="database" size={20} color="white" />
-          <Text style={styles.syncButtonText}>Sync Product Data</Text>
-        </TouchableOpacity>
-      </View>
-
-      {syncResults.length > 0 && (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Sync Results</Text>
-          {syncResults.map((result, index) => (
-            <Text key={index} style={styles.syncResult}>
-              {result}
-          </Text>
-          ))}
-        </View>
-      )}
-    </ScrollView>
-  );
-
-  const renderRestockTab = () => (
-    <View style={styles.restockContainer}>
-      <View style={styles.categoryHeader}>
-        <Text style={styles.categoryTitle}>Hair Accessories</Text>
-        </View>
-
-      <FlatList
-        data={restockItems}
-        renderItem={renderRestockItem}
-        keyExtractor={(item) => item.id}
-        style={styles.list}
-        showsVerticalScrollIndicator={false}
-      />
-        </View>
-  );
+  };
 
   const renderTabContent = () => {
     switch (activeTab) {
       case 'restock':
-        return renderRestockTab();
+        if (loading) {
+          return (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color="#007AFF" />
+              <Text style={styles.loadingText}>Loading restock data...</Text>
+            </View>
+          );
+        }
+
+        if (!restockData || restockData.items.length === 0) {
+          return (
+            <View style={styles.emptyContainer}>
+              <Ionicons name="cube-outline" size={64} color="#8E8E93" />
+              <Text style={styles.emptyText}>No items need restocking</Text>
+              <Text style={styles.emptySubtext}>All items are up to date</Text>
+            </View>
+          );
+        }
+
+        return (
+          <FlatList
+            data={restockData.items}
+            renderItem={renderRestockItem}
+            keyExtractor={(item) => item.id}
+            refreshControl={
+              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+            }
+            contentContainerStyle={styles.listContainer}
+          />
+        );
+
       case 'online':
-        return renderOnlineTab();
+        return (
+          <View style={styles.tabContent}>
+            <Text style={styles.tabText}>Online Orders</Text>
+            <Text style={styles.comingSoon}>Coming Soon</Text>
+          </View>
+        );
+
       case 'review':
-        return renderReviewTab();
+        if (!restockData) return null;
+        
+        const reviewItems = restockData.items.filter(item => item.review === 1);
+        
+        return (
+          <View style={styles.tabContent}>
+            <Text style={styles.tabText}>Items Under Review</Text>
+            {reviewItems.length === 0 ? (
+              <Text style={styles.noItemsText}>No items under review</Text>
+            ) : (
+              <FlatList
+                data={reviewItems}
+                renderItem={renderRestockItem}
+                keyExtractor={(item) => item.id}
+                contentContainerStyle={styles.listContainer}
+              />
+            )}
+          </View>
+        );
+
       case 'settings':
-        return renderSettingsTab();
+        return (
+          <View style={styles.tabContent}>
+            <Text style={styles.tabText}>Settings</Text>
+            <TouchableOpacity style={styles.syncButton} onPress={onRefresh}>
+              <Ionicons name="refresh" size={20} color="#007AFF" />
+              <Text style={styles.syncButtonText}>Sync Stock Data</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity style={styles.syncButton} onPress={handleSyncSales}>
+              <Ionicons name="sync" size={20} color="#34C759" />
+              <Text style={styles.syncButtonText}>Restock Sales Sync</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity style={styles.syncButton} onPress={handleRestockProductSync}>
+              <Ionicons name="cube" size={20} color="#AF52DE" />
+              <Text style={styles.syncButtonText}>Sync Product Data</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity style={styles.syncButton} onPress={handleClearRestockTable}>
+              <Ionicons name="refresh-circle" size={20} color="#FF3B30" />
+              <Text style={styles.syncButtonText}>Reset Restock Quantities</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity style={styles.syncButton} onPress={handleClearSalesData}>
+              <Ionicons name="trash-outline" size={20} color="#FF9500" />
+              <Text style={styles.syncButtonText}>Clear Sales Data</Text>
+            </TouchableOpacity>
+          </View>
+        );
+
       default:
-        return renderRestockTab();
+        return null;
     }
   };
 
+  if (!restockData && !loading) {
+    return (
+      <View style={styles.errorContainer}>
+        <Ionicons name="alert-circle-outline" size={64} color="#FF3B30" />
+        <Text style={styles.errorText}>Failed to load restock data</Text>
+        <TouchableOpacity style={styles.retryButton} onPress={loadRestockData}>
+          <Text style={styles.retryButtonText}>Retry</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
   return (
-    <View style={styles.screen}>
+    <View style={styles.container}>
+      {/* Header */}
       <LinearGradient
-        colors={['#39b878', '#2E9A65']}
+        colors={['#007AFF', '#0056CC']}
         style={styles.header}
       >
-        <View style={styles.headerLeft}>
-          <TouchableOpacity 
-            style={styles.backButton}
-            onPress={() => navigation.goBack()}
-          >
-            <Icon name="arrow-left" size={24} color="#ffffff" />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Restocker</Text>
-        </View>
+        <Text style={styles.headerTitle}>Restocker</Text>
+        <Text style={styles.headerSubtitle}>{location.charAt(0).toUpperCase() + location.slice(1)}</Text>
       </LinearGradient>
 
-      <View style={styles.contentWrapper}>
-        {/* Tab Content */}
-        <View style={styles.content}>
-          {renderTabContent()}
-        </View>
-
-        {/* Bottom Navigation */}
-        <View style={styles.bottomNavigation}>
-          <TouchableOpacity
-            style={[styles.tabButton, activeTab === 'restock' && styles.activeTabButton]}
-            onPress={() => setActiveTab('restock')}
-          >
-            <Icon 
-              name="package-variant" 
-              size={24} 
-              color={activeTab === 'restock' ? '#39b878' : '#999'} 
-            />
-            <Text style={[
-              styles.tabText, 
-              { color: activeTab === 'restock' ? '#39b878' : '#999' }
-            ]}>
-              Restock
-            </Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity
-            style={[styles.tabButton, activeTab === 'online' && styles.activeTabButton]}
-            onPress={() => setActiveTab('online')}
-          >
-            <Icon 
-              name="shopping" 
-              size={24} 
-              color={activeTab === 'online' ? '#39b878' : '#999'} 
-            />
-            <Text style={[
-              styles.tabText, 
-              { color: activeTab === 'online' ? '#39b878' : '#999' }
-            ]}>
-              Online
-          </Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity
-            style={[styles.tabButton, activeTab === 'review' && styles.activeTabButton]}
-            onPress={() => setActiveTab('review')}
-          >
-            <Icon 
-              name="clipboard-check" 
-              size={24} 
-              color={activeTab === 'review' ? '#39b878' : '#999'} 
-            />
-            <Text style={[
-              styles.tabText, 
-              { color: activeTab === 'review' ? '#39b878' : '#999' }
-            ]}>
-              Review
-                    </Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity
-            style={[styles.tabButton, activeTab === 'settings' && styles.activeTabButton]}
-            onPress={() => setActiveTab('settings')}
-          >
-            <Icon 
-              name="cog" 
-              size={24} 
-              color={activeTab === 'settings' ? '#39b878' : '#999'} 
-            />
-            <Text style={[
-              styles.tabText, 
-              { color: activeTab === 'settings' ? '#39b878' : '#999' }
-            ]}>
-              Settings
-          </Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      {/* Loading Overlay */}
-      {isLoading && (
-        <View style={styles.loadingOverlay}>
-          <ActivityIndicator size="large" color="#39b878" />
-          <Text style={styles.loadingText}>Syncing...</Text>
+      {/* Summary Stats */}
+      {restockData && (
+        <View style={styles.summaryContainer}>
+          <View style={styles.summaryRow}>
+            <View style={styles.summaryItem}>
+              <Text style={styles.summaryNumber}>{restockData.totalSold}</Text>
+              <Text style={styles.summaryLabel}>Sold</Text>
+            </View>
+            <View style={styles.summaryItem}>
+              <Text style={styles.summaryNumber}>{restockData.totalPicked}</Text>
+              <Text style={styles.summaryLabel}>Picked</Text>
+            </View>
+            <View style={styles.summaryItem}>
+              <Text style={styles.summaryNumber}>{restockData.totalReview}</Text>
+              <Text style={styles.summaryLabel}>Review</Text>
+            </View>
+            <View style={styles.summaryItem}>
+              <Text style={styles.summaryNumber}>{restockData.totalMissing}</Text>
+              <Text style={styles.summaryLabel}>Missing</Text>
+            </View>
+          </View>
         </View>
       )}
+
+      {/* Tabs */}
+      <View style={styles.tabContainer}>
+        {['restock', 'online', 'review', 'settings'].map((tab) => (
+          <TouchableOpacity
+            key={tab}
+            style={[styles.tab, activeTab === tab && styles.activeTab]}
+            onPress={() => setActiveTab(tab)}
+          >
+            <Text style={[styles.tabText, activeTab === tab && styles.activeTabText]}>
+              {tab.charAt(0).toUpperCase() + tab.slice(1)}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      {/* Tab Content */}
+      {renderTabContent()}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: {
+  container: {
     flex: 1,
-    backgroundColor: '#39b878',
+    backgroundColor: '#F2F2F7',
   },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    paddingTop: 60,
+    paddingBottom: 20,
     paddingHorizontal: 20,
-    paddingTop: 50,
-    paddingBottom: 40,
-  },
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 8,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    marginRight: 15,
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   headerTitle: {
-    fontSize: 24,
-    fontFamily: 'Inter-Bold',
-    color: '#ffffff',
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+    textAlign: 'center',
   },
-  contentWrapper: {
-    backgroundColor: '#f5f5f5',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 20,
-    paddingBottom: 60,
-    marginTop: -20,
-    flex: 1,
+  headerSubtitle: {
+    fontSize: 18,
+    color: '#FFFFFF',
+    textAlign: 'center',
+    marginTop: 5,
+    opacity: 0.9,
   },
-  content: {
-    flex: 1,
+  summaryContainer: {
+    backgroundColor: '#FFFFFF',
+    margin: 16,
+    borderRadius: 12,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
-  bottomNavigation: {
+  summaryRow: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    paddingVertical: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#e0e0e0',
-    backgroundColor: '#FFFFFF',
   },
-  tabButton: {
+  summaryItem: {
     alignItems: 'center',
-    paddingVertical: 8,
-    paddingHorizontal: 12,
+  },
+  summaryNumber: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#007AFF',
+  },
+  summaryLabel: {
+    fontSize: 12,
+    color: '#8E8E93',
+    marginTop: 4,
+  },
+  tabContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#FFFFFF',
+    marginHorizontal: 16,
+    borderRadius: 12,
+    padding: 4,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  tab: {
+    flex: 1,
+    paddingVertical: 12,
+    alignItems: 'center',
     borderRadius: 8,
   },
-  activeTabButton: {
-    backgroundColor: 'rgba(57, 184, 120, 0.1)',
+  activeTab: {
+    backgroundColor: '#007AFF',
   },
   tabText: {
-    fontSize: 12,
-    marginTop: 4,
-    fontWeight: '500',
-  },
-  restockContainer: {
-    flex: 1,
-    paddingHorizontal: 20,
-  },
-  categoryHeader: {
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E0E0E0',
-  },
-  categoryTitle: {
-    fontSize: 18,
+    fontSize: 14,
     fontWeight: '600',
-    color: '#333',
+    color: '#8E8E93',
   },
-  list: {
+  activeTabText: {
+    color: '#FFFFFF',
+  },
+  tabContent: {
     flex: 1,
+    padding: 16,
   },
-  item: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 16,
-    paddingHorizontal: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
+  listContainer: {
+    paddingBottom: 20,
+  },
+  itemCard: {
     backgroundColor: '#FFFFFF',
+    marginHorizontal: 16,
+    marginBottom: 12,
+    borderRadius: 12,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
-  itemImageContainer: {
-    width: 60,
-    height: 60,
-    borderRadius: 8,
-    backgroundColor: '#F5F5F5',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 16,
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-  },
-  itemImagePlaceholder: {
-    width: 24,
-    height: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  itemDetails: {
-    flex: 1,
-    marginRight: 16,
-  },
-  itemSku: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: '#666',
-    marginBottom: 4,
+  itemHeader: {
+    marginBottom: 12,
   },
   itemName: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '600',
-    color: '#333',
+    color: '#000000',
     marginBottom: 4,
   },
-  itemInstock: {
-    fontSize: 12,
-    color: '#666',
-    marginBottom: 2,
+  itemSku: {
+    fontSize: 14,
+    color: '#8E8E93',
+    fontFamily: 'monospace',
   },
-  itemSold: {
-    fontSize: 12,
-    color: '#666',
+  itemDetails: {
+    marginBottom: 12,
   },
-  itemQuantity: {
-    alignItems: 'center',
-    minWidth: 80,
-  },
-  quantityNumber: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#333',
-    marginBottom: 8,
-  },
-  quantityControls: {
+  quantityRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginBottom: 8,
+  },
+  quantityLabel: {
+    fontSize: 14,
+    color: '#8E8E93',
+    width: 60,
+  },
+  quantityValue: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginRight: 8,
+  },
+  soldQuantity: {
+    color: '#FF3B30',
+  },
+  pickedQuantity: {
+    color: '#34C759',
+  },
+  incrementButton: {
+    backgroundColor: '#34C759',
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  itemOption: {
+    fontSize: 12,
+    color: '#8E8E93',
+    fontStyle: 'italic',
+  },
+  statusRow: {
+    flexDirection: 'row',
+    marginBottom: 12,
+    flexWrap: 'wrap',
+  },
+  statusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginRight: 8,
+    marginBottom: 4,
+  },
+  reviewBadge: {
+    backgroundColor: '#FF9500',
+  },
+  storeroomBadge: {
+    backgroundColor: '#007AFF',
+  },
+  missingBadge: {
+    backgroundColor: '#FF3B30',
+  },
+  statusText: {
+    fontSize: 12,
+    color: '#FFFFFF',
+    fontWeight: '600',
+  },
+  actionRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 8,
   },
-  quantityButton: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    justifyContent: 'center',
-    alignItems: 'center',
+  actionButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#E0E0E0',
-    backgroundColor: '#FFFFFF',
   },
-  tabPlaceholder: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 40,
+  reviewButton: {
+    backgroundColor: '#FF9500',
+    borderColor: '#FF9500',
   },
-  tabPlaceholderText: {
-    fontSize: 20,
+  storeroomButton: {
+    backgroundColor: '#007AFF',
+    borderColor: '#007AFF',
+  },
+  missingButton: {
+    backgroundColor: '#FF3B30',
+    borderColor: '#FF3B30',
+  },
+  actionButtonText: {
+    color: '#FFFFFF',
+    fontSize: 12,
     fontWeight: '600',
-    marginTop: 16,
-    textAlign: 'center',
   },
-  tabPlaceholderSubtext: {
-    fontSize: 14,
-    marginTop: 8,
-    textAlign: 'center',
-    color: '#666',
-    lineHeight: 20,
-  },
-  settingsContainer: {
+  loadingContainer: {
     flex: 1,
-    padding: 20,
-  },
-  section: {
-    marginBottom: 32,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    marginBottom: 16,
-    color: '#333',
-  },
-  syncButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 12,
-    gap: 12,
-    backgroundColor: '#39b878',
-  },
-  syncButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '500',
-  },
-  syncResult: {
-    fontSize: 14,
-    marginBottom: 8,
-    paddingLeft: 16,
-    color: '#666',
-  },
-  loadingOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   loadingText: {
     marginTop: 16,
     fontSize: 16,
-    fontWeight: '500',
-    color: '#333',
+    color: '#8E8E93',
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 32,
+  },
+  emptyText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#8E8E93',
+    marginTop: 16,
+  },
+  emptySubtext: {
+    fontSize: 14,
+    color: '#8E8E93',
+    marginTop: 8,
+  },
+  comingSoon: {
+    fontSize: 16,
+    color: '#8E8E93',
+    textAlign: 'center',
+    marginTop: 20,
+  },
+  noItemsText: {
+    fontSize: 16,
+    color: '#8E8E93',
+    textAlign: 'center',
+    marginTop: 20,
+  },
+  syncButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F2F2F7',
+    padding: 16,
+    borderRadius: 12,
+    marginTop: 16,
+  },
+  syncButtonText: {
+    marginLeft: 12,
+    fontSize: 16,
+    color: '#007AFF',
+    fontWeight: '600',
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 32,
+  },
+  errorText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#FF3B30',
+    marginTop: 16,
+    textAlign: 'center',
+  },
+  retryButton: {
+    backgroundColor: '#007AFF',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+    marginTop: 16,
+  },
+  retryButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
   },
 }); 
